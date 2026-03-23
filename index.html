@@ -60,13 +60,13 @@
         try {
           const response = await fetch('./@vite/client', { cache: 'no-store' });
           if (response.ok) {
-            go('./app.html', 'Development server detected. Opening app...');
+            go('./app-shell.html', 'Development server detected. Opening app...');
             return;
           }
         } catch (error) {
         }
 
-        go('./dist/app.html', 'Opening built app...');
+        go('./dist/app-shell.html', 'Opening built app...');
       };
 
       boot();

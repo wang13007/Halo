@@ -12,7 +12,7 @@ export default defineConfig(({mode}) => {
     build: {
       rollupOptions: {
         input: {
-          index: path.resolve(__dirname, 'app.html'),
+          index: path.resolve(__dirname, 'app-shell.html'),
         },
       },
     },
@@ -32,7 +32,7 @@ export default defineConfig(({mode}) => {
           changeOrigin: true,
         },
       },
-      open: '/app.html',
+      open: '/app-shell.html',
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };

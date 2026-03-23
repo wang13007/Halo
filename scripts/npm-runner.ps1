@@ -13,7 +13,7 @@ $runnerPath = Join-Path $projectRoot 'scripts\run-local-cli.cjs'
 $exitCode = $LASTEXITCODE
 
 if ($exitCode -eq 0 -and $Tool -eq 'vite' -and $Args.Length -gt 0 -and $Args[0] -eq 'build') {
-  $builtHtmlPath = Join-Path $projectRoot 'dist\app.html'
+  $builtHtmlPath = Join-Path $projectRoot 'dist\app-shell.html'
   $indexHtmlPath = Join-Path $projectRoot 'dist\index.html'
 
   if (Test-Path $builtHtmlPath) {

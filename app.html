@@ -3,10 +3,73 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>My Google AI Studio App</title>
+    <title>Halo</title>
+    <style>
+      :root {
+        color-scheme: light;
+        font-family: "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background:
+          radial-gradient(circle at top left, rgba(59, 130, 246, 0.2), transparent 35%),
+          linear-gradient(135deg, #eff6ff, #f8fafc 55%, #dbeafe);
+        color: #0f172a;
+      }
+
+      .shell {
+        width: min(92vw, 520px);
+        padding: 32px 28px;
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.82);
+        border: 1px solid rgba(148, 163, 184, 0.25);
+        backdrop-filter: blur(16px);
+        box-shadow: 0 24px 80px rgba(15, 23, 42, 0.12);
+      }
+
+      h1 {
+        margin: 0 0 10px;
+        font-size: 24px;
+      }
+
+      p {
+        margin: 0;
+        line-height: 1.6;
+        color: #475569;
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
-    <script type="module" src="./src/main.tsx"></script>
+    <div class="shell">
+      <h1>Halo is starting</h1>
+      <p id="status">Checking runtime and redirecting...</p>
+    </div>
+    <script>
+      const statusNode = document.getElementById('status');
+
+      const go = (target, message) => {
+        statusNode.textContent = message;
+        window.location.replace(target);
+      };
+
+      const boot = async () => {
+        try {
+          const response = await fetch('./@vite/client', { cache: 'no-store' });
+          if (response.ok) {
+            go('./app-shell.html', 'Development server detected. Opening app...');
+            return;
+          }
+        } catch (error) {
+        }
+
+        go('./dist/app-shell.html', 'Opening built app...');
+      };
+
+      boot();
+    </script>
   </body>
 </html>
