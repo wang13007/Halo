@@ -17,12 +17,18 @@ import {
   Zap,
 } from 'lucide-react';
 import { api } from '../lib/api';
-import { createAppId, type AppCenterState, type AppIconKey, type AppItem, type AppTab } from '../lib/apps';
+import {
+  createAppId,
+  type AppCenterState,
+  type AppIconKey,
+  type AppItem,
+  type AppTab,
+} from '../lib/apps';
 
 const tabs: Array<{ id: AppTab; label: string }> = [
   { id: 'favorites', label: '收藏应用' },
   { id: 'mine', label: '我的应用' },
-  { id: 'market', label: '应用商店' },
+  { id: 'market', label: '应用商场' },
 ];
 
 const iconMap: Record<AppIconKey, React.ComponentType<{ className?: string; size?: number }>> = {
@@ -40,6 +46,8 @@ type AiAppForm = {
   name: string;
   prompt: string;
 };
+
+const recentUpdateLabel = '最近更新: 2h前';
 
 export const AppsShowcase = ({
   appCenterState,
@@ -67,6 +75,10 @@ export const AppsShowcase = ({
     ? 'border-white/10 bg-slate-900/70'
     : 'border-white/80 bg-white/84';
   const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
+  const tileSurface = isDarkMode
+    ? 'border-white/10 bg-slate-900/75'
+    : 'border-slate-200/70 bg-white/90';
+  const tabRailSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-100/80';
 
   const visibleApps = useMemo(() => {
     if (appCenterState.activeTab === 'favorites') {
@@ -199,10 +211,94 @@ export const AppsShowcase = ({
     }
   };
 
+  const renderCardActions = (app: AppItem) => {
+    const isMineView = appCenterState.activeTab === 'mine';
+    const isMarketView = appCenterState.activeTab === 'market';
+
+    if (isMineView) {
+      return (
+        <div className="mt-4 grid gap-2">
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleRun(app)}
+              className="inline-flex items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+            >
+              <Play size={14} />
+              运行
+            </button>
+            <button
+              onClick={() => openEditModal(app)}
+              className={`inline-flex items-center justify-center gap-2 rounded-[16px] border px-3 py-2.5 text-xs font-bold ${tileSurface} ${textPrimary}`}
+            >
+              <PencilLine size={14} />
+              编辑
+            </button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleCopy(app)}
+              className={`inline-flex items-center justify-center gap-2 rounded-[16px] border px-3 py-2.5 text-xs font-bold ${tileSurface} ${textPrimary}`}
+            >
+              <Copy size={14} />
+              复制
+            </button>
+            <button
+              onClick={() => removeApp(app.id)}
+              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-rose-200 px-3 py-2.5 text-xs font-bold text-rose-500"
+            >
+              <Trash2 size={14} />
+              删除
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    if (isMarketView) {
+      return (
+        <div className="mt-4 flex gap-2">
+          <button
+            onClick={() => handleInstall(app.id)}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20 disabled:opacity-60"
+            disabled={app.installed}
+          >
+            {app.installed ? '已安装' : '安装'}
+          </button>
+          {app.installed && (
+            <button
+              onClick={() => handleToggleFavorite(app.id)}
+              className={`inline-flex items-center justify-center gap-2 rounded-[16px] border px-3 py-2.5 text-xs font-bold ${tileSurface} ${textPrimary}`}
+            >
+              {app.favorite ? '已收藏' : '加入收藏'}
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return (
+      <div className="mt-4 flex gap-2">
+        <button
+          onClick={() => handleRun(app)}
+          className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+        >
+          <Play size={14} />
+          运行
+        </button>
+        <button
+          onClick={() => handleToggleFavorite(app.id)}
+          className={`inline-flex items-center justify-center gap-2 rounded-[16px] border px-3 py-2.5 text-xs font-bold ${tileSurface} ${textPrimary}`}
+        >
+          {app.favorite ? '取消收藏' : '加入收藏'}
+        </button>
+      </div>
+    );
+  };
+
   return (
-    <div className="flex h-full flex-col gap-4 overflow-hidden">
+    <div className="flex h-full flex-col gap-3 overflow-hidden">
       <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
+        <div className={`flex flex-wrap gap-2 rounded-[22px] p-1 ${tabRailSurface}`}>
           {tabs.map((tab) => (
             <button
               key={tab.id}
@@ -212,10 +308,10 @@ export const AppsShowcase = ({
                   activeTab: tab.id,
                 }))
               }
-              className={`rounded-full px-4 py-2 text-sm font-bold transition ${
+              className={`rounded-[18px] px-4 py-2 text-sm font-bold transition ${
                 appCenterState.activeTab === tab.id
-                  ? 'bg-slate-900 text-white dark:bg-white dark:text-slate-900'
-                  : `${cardSurface} ${textPrimary}`
+                  ? 'bg-white text-blue-600 shadow-sm shadow-slate-900/8 dark:bg-white dark:text-slate-900'
+                  : `bg-transparent ${textSecondary}`
               }`}
             >
               {tab.label}
@@ -228,7 +324,7 @@ export const AppsShowcase = ({
           {appCenterState.activeTab === 'mine' && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900"
+              className="inline-flex items-center gap-2 rounded-[18px] bg-slate-900 px-4 py-2 text-sm font-bold text-white dark:bg-white dark:text-slate-900"
             >
               <Plus size={15} />
               创建应用
@@ -237,123 +333,98 @@ export const AppsShowcase = ({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 auto-rows-fr gap-4 overflow-y-auto pr-1 md:grid-cols-2 xl:grid-cols-4">
-        {visibleApps.map((app) => {
-          const Icon = iconMap[app.icon];
-          const isMineView = appCenterState.activeTab === 'mine';
-          const isMarketView = appCenterState.activeTab === 'market';
+      <div className="min-h-0 flex-1 overflow-y-auto pr-1">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(232px,272px))] content-start justify-start gap-4 pb-1">
+          {visibleApps.map((app) => {
+            const Icon = iconMap[app.icon];
 
-          return (
-            <article
-              key={app.id}
-              className={`flex flex-col rounded-[24px] border p-4 shadow-sm ${cardSurface}`}
+            return (
+              <article
+                key={app.id}
+                className={`flex min-h-[228px] flex-col rounded-[28px] border px-5 py-4 shadow-sm ${tileSurface}`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div
+                    className={`flex h-14 w-14 items-center justify-center rounded-[20px] border shadow-sm ${
+                      isDarkMode
+                        ? 'border-white/10 bg-white/5'
+                        : 'border-slate-200/70 bg-white'
+                    }`}
+                  >
+                    <Icon size={22} className="text-blue-600" />
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-[11px] font-bold text-blue-600">
+                      {app.badge}
+                    </span>
+
+                    {app.installed && (
+                      <button
+                        onClick={() => handleToggleFavorite(app.id)}
+                        className={`rounded-full p-1.5 ${
+                          app.favorite
+                            ? 'bg-rose-500/10 text-rose-500'
+                            : `${mutedSurface} ${textPrimary}`
+                        }`}
+                        title={app.favorite ? '取消收藏' : '加入收藏'}
+                      >
+                        <Heart size={14} className={app.favorite ? 'fill-current' : ''} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="mt-5 flex-1">
+                  <h3 className={`text-[17px] font-black tracking-tight ${textPrimary}`}>
+                    {app.title}
+                  </h3>
+                  <p className={`mt-2 h-10 overflow-hidden text-sm leading-5 ${textSecondary}`}>
+                    {app.description}
+                  </p>
+                  <div className={`mt-3 text-xs font-semibold ${textSecondary}`}>
+                    {recentUpdateLabel}
+                  </div>
+                </div>
+
+                {renderCardActions(app)}
+              </article>
+            );
+          })}
+
+          {appCenterState.activeTab === 'mine' && (
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className={`flex min-h-[228px] flex-col items-center justify-center rounded-[28px] border border-dashed px-5 py-4 text-center transition ${
+                isDarkMode
+                  ? 'border-white/12 bg-white/[0.03] hover:bg-white/[0.05]'
+                  : 'border-slate-200 bg-white/35 hover:bg-white/60'
+              }`}
             >
-              <div className="flex items-center justify-between gap-3">
-                <div className={`rounded-2xl p-2.5 ${mutedSurface}`}>
-                  <Icon size={18} className="text-blue-600" />
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
-                    {app.badge}
-                  </span>
-                  {app.installed && (
-                    <button
-                      onClick={() => handleToggleFavorite(app.id)}
-                      className={`rounded-full p-1.5 ${
-                        app.favorite ? 'bg-rose-500/10 text-rose-500' : `${mutedSurface} ${textPrimary}`
-                      }`}
-                      title={app.favorite ? '取消收藏' : '加入收藏'}
-                    >
-                      <Heart size={14} className={app.favorite ? 'fill-current' : ''} />
-                    </button>
-                  )}
-                </div>
+              <div
+                className={`flex h-16 w-16 items-center justify-center rounded-full ${
+                  isDarkMode ? 'bg-white/8 text-slate-300' : 'bg-slate-100 text-slate-400'
+                }`}
+              >
+                <Plus size={28} />
               </div>
+              <div className={`mt-6 text-[17px] font-black tracking-tight ${textPrimary}`}>
+                创建新应用
+              </div>
+              <div className={`mt-2 max-w-[180px] text-sm leading-5 ${textSecondary}`}>
+                用 AI Coding 或自定义流程快速补充你的业务应用。
+              </div>
+            </button>
+          )}
 
-              <h3 className={`mt-4 text-lg font-black ${textPrimary}`}>{app.title}</h3>
-              <p className={`mt-2 flex-1 text-sm leading-6 ${textSecondary}`}>{app.description}</p>
-
-              {isMineView ? (
-                <div className="mt-4 grid gap-2">
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleRun(app)}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white dark:bg-white dark:text-slate-900"
-                    >
-                      <Play size={14} />
-                      运行
-                    </button>
-                    <button
-                      onClick={() => openEditModal(app)}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${cardSurface} ${textPrimary}`}
-                    >
-                      <PencilLine size={14} />
-                      编辑
-                    </button>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      onClick={() => handleCopy(app)}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${cardSurface} ${textPrimary}`}
-                    >
-                      <Copy size={14} />
-                      复制
-                    </button>
-                    <button
-                      onClick={() => removeApp(app.id)}
-                      className="inline-flex items-center justify-center gap-2 rounded-xl border border-rose-200 px-3 py-2 text-xs font-bold text-rose-500"
-                    >
-                      <Trash2 size={14} />
-                      删除
-                    </button>
-                  </div>
-                </div>
-              ) : isMarketView ? (
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => handleInstall(app.id)}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white disabled:opacity-60 dark:bg-white dark:text-slate-900"
-                    disabled={app.installed}
-                  >
-                    {app.installed ? '已安装' : '安装'}
-                  </button>
-                  {app.installed && (
-                    <button
-                      onClick={() => handleToggleFavorite(app.id)}
-                      className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${cardSurface} ${textPrimary}`}
-                    >
-                      {app.favorite ? '已收藏' : '加收藏'}
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="mt-4 flex gap-2">
-                  <button
-                    onClick={() => handleRun(app)}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-900 px-3 py-2 text-xs font-bold text-white dark:bg-white dark:text-slate-900"
-                  >
-                    <Play size={14} />
-                    运行
-                  </button>
-                  <button
-                    onClick={() => handleToggleFavorite(app.id)}
-                    className={`inline-flex items-center justify-center gap-2 rounded-xl border px-3 py-2 text-xs font-bold ${cardSurface} ${textPrimary}`}
-                  >
-                    {app.favorite ? '取消收藏' : '加收藏'}
-                  </button>
-                </div>
-              )}
-            </article>
-          );
-        })}
-
-        {visibleApps.length === 0 && (
-          <div
-            className={`col-span-full flex min-h-[220px] items-center justify-center rounded-[24px] border border-dashed text-sm ${textSecondary}`}
-          >
-            当前标签还没有应用，试试创建应用或把已安装应用加入收藏。
-          </div>
-        )}
+          {visibleApps.length === 0 && (
+            <div
+              className={`col-span-full flex min-h-[220px] items-center justify-center rounded-[24px] border border-dashed px-6 text-sm ${textSecondary}`}
+            >
+              当前标签还没有应用，试试创建应用或把已安装应用加入收藏。
+            </div>
+          )}
+        </div>
       </div>
 
       {editingApp && (
@@ -372,7 +443,10 @@ export const AppsShowcase = ({
               <textarea
                 value={editingDraft.description}
                 onChange={(event) =>
-                  setEditingDraft((previous) => ({ ...previous, description: event.target.value }))
+                  setEditingDraft((previous) => ({
+                    ...previous,
+                    description: event.target.value,
+                  }))
                 }
                 className={`min-h-[120px] w-full resize-none rounded-2xl border px-4 py-3 text-sm leading-6 focus:outline-none ${cardSurface} ${textPrimary}`}
                 placeholder="应用说明"

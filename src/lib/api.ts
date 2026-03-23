@@ -176,6 +176,12 @@ export type GenerateArtifactResponse = {
   usedFallback: boolean;
 };
 
+export type EnergyQuickProject = {
+  channel: string;
+  name: string;
+  orgId: string;
+};
+
 export const api = {
   chatWithAi: (payload: AiChatPayload, signal?: AbortSignal) =>
     request<AiChatResponse>('/api/ai/chat', {
@@ -200,6 +206,8 @@ export const api = {
         projectCode ? `?projectCode=${encodeURIComponent(projectCode)}` : ''
       }`,
     ),
+  getEnergyQuickProjects: (signal?: AbortSignal) =>
+    request<{ projects: EnergyQuickProject[] }>('/api/energy/quick-projects', { signal }),
   getHealth: () => request<HealthResponse>('/api/health'),
   getIntegrations: (projectCode?: string) =>
     request<{ integrations: Integration[] }>(

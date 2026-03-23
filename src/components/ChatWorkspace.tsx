@@ -8,7 +8,7 @@ import {
   Sparkles,
   Square,
 } from 'lucide-react';
-import { api } from '../lib/api';
+import { api, type EnergyQuickProject } from '../lib/api';
 import { buildEnergyQueryPayload, queryEnergyReport, type ChatQueryForm } from '../lib/energyQuery';
 
 type QuickIntentId =
@@ -34,9 +34,13 @@ type HistoryItem = {
   userPrompt: string;
 };
 
-const projectPresetMap: Record<string, string> = {
-  A区: 'L-SH00-SHZXM00.04',
-};
+const fallbackProjectOptions: EnergyQuickProject[] = [
+  {
+    channel: 'C2',
+    name: 'A区',
+    orgId: 'L-SH00-SHZXM00.04',
+  },
+];
 
 const quickIntents: Array<{
   description: string;
@@ -100,13 +104,14 @@ const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
 const intentTriggerPattern = /[查用点能耗报诊]/;
 
 export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
+  const initialProjectOption = fallbackProjectOptions[0];
   const [chatForm, setChatForm] = useState<ChatQueryForm>({
     energyType: '电',
     interval: '1小时',
-    orgId: projectPresetMap.A区,
+    orgId: initialProjectOption.orgId,
     pageNum: 1,
     pageSize: 20,
-    project: 'A区',
+    project: initialProjectOption.name,
     queryName: '',
     timeRange: '今天',
   });
@@ -114,6 +119,10 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const [input, setInput] = useState('');
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(true);
   const [isThinking, setIsThinking] = useState(false);
+  const [hasLoadedProjects, setHasLoadedProjects] = useState(false);
+  const [projectOptions, setProjectOptions] = useState<EnergyQuickProject[]>(fallbackProjectOptions);
+  const [projectLoadError, setProjectLoadError] = useState('');
+  const [projectsLoading, setProjectsLoading] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState<QuickIntentId | null>(null);
 
   const activeRequestRef = useRef<AbortController | null>(null);
@@ -130,6 +139,75 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     },
     [],
   );
+
+  useEffect(() => {
+    if (!selectedIntent || hasLoadedProjects) {
+      return;
+    }
+
+    const requestController = new AbortController();
+    let isMounted = true;
+
+    const loadQuickProjects = async () => {
+      setProjectsLoading(true);
+
+      try {
+        const response = await api.getEnergyQuickProjects(requestController.signal);
+
+        if (!isMounted) {
+          return;
+        }
+
+        const nextProjects = response.projects.filter(
+          (project) => Boolean(project?.name?.trim()) && Boolean(project?.orgId?.trim()),
+        );
+
+        if (nextProjects.length === 0) {
+          setHasLoadedProjects(true);
+          setProjectLoadError('项目接口未返回 C2 项目，已暂时使用默认项目。');
+          setProjectOptions(fallbackProjectOptions);
+          return;
+        }
+
+        setProjectLoadError('');
+        setProjectOptions(nextProjects);
+        setHasLoadedProjects(true);
+        setChatForm((previous) => {
+          const matchedProject =
+            nextProjects.find(
+              (project) => project.orgId === previous.orgId || project.name === previous.project,
+            ) ?? nextProjects[0];
+
+          return {
+            ...previous,
+            orgId: matchedProject.orgId,
+            project: matchedProject.name,
+          };
+        });
+      } catch (error) {
+        if (isMounted) {
+          setHasLoadedProjects(true);
+          setProjectLoadError(
+            error instanceof Error
+              ? error.message
+              : '项目列表同步失败，已暂时使用默认项目。',
+          );
+          setProjectOptions(fallbackProjectOptions);
+        }
+      } finally {
+        if (isMounted) {
+          setProjectsLoading(false);
+        }
+      }
+    };
+
+    void loadQuickProjects();
+
+    return () => {
+      isMounted = false;
+      requestController.abort();
+    };
+  }, [hasLoadedProjects, selectedIntent]);
 
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
   const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
@@ -162,11 +240,17 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     );
   };
 
-  const handleProjectChange = (project: string) => {
+  const handleProjectChange = (orgId: string) => {
+    const matchedProject = projectOptions.find((project) => project.orgId === orgId);
+
+    if (!matchedProject) {
+      return;
+    }
+
     setChatForm((previous) => ({
       ...previous,
-      orgId: projectPresetMap[project] ?? previous.orgId,
-      project,
+      orgId: matchedProject.orgId,
+      project: matchedProject.name,
     }));
   };
 
@@ -176,6 +260,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     }
 
     const message = input.trim();
+    const activeIntent = selectedIntent;
     const requestController = new AbortController();
     activeRequestRef.current = requestController;
 
@@ -185,6 +270,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       role: 'user',
     });
     setInput('');
+    setSelectedIntent(null);
     setIsThinking(true);
 
     try {
@@ -192,7 +278,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       let requestPayload: Record<string, unknown> | null = null;
       let upstreamStatus: number | null = null;
 
-      if (selectedIntent) {
+      if (activeIntent) {
         requestPayload = buildEnergyQueryPayload(chatForm);
         const reportResponse = await queryEnergyReport(requestPayload, requestController.signal);
         dataPreview = reportResponse.data ?? null;
@@ -201,7 +287,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
       const response = await api.chatWithAi(
         {
-          action: selectedIntent ?? undefined,
+          action: activeIntent ?? undefined,
           context: {
             energyType: chatForm.energyType,
             interval: chatForm.interval,
@@ -257,6 +343,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       { content: item.userPrompt, id: createId(), role: 'user' },
       { content: item.assistantReply, id: createId(), role: 'assistant', showThinking: false },
     ]);
+    setSelectedIntent(null);
   };
 
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -368,11 +455,16 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
                 <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                   <select
-                    value={chatForm.project}
+                    value={chatForm.orgId}
                     onChange={(event) => handleProjectChange(event.target.value)}
+                    disabled={projectsLoading && projectOptions.length === 0}
                     className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
                   >
-                    <option value="A区">A区</option>
+                    {projectOptions.map((project) => (
+                      <option key={project.orgId} value={project.orgId}>
+                        {project.name}
+                      </option>
+                    ))}
                   </select>
                   <select
                     value={chatForm.energyType}
@@ -407,6 +499,14 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
                     <option value="1天">1天</option>
                   </select>
                 </div>
+
+                {projectsLoading && (
+                  <div className={`mt-2 text-xs ${textSecondary}`}>项目列表同步中...</div>
+                )}
+
+                {projectLoadError && (
+                  <div className="mt-2 text-xs text-rose-500">{projectLoadError}</div>
+                )}
               </div>
             )}
 

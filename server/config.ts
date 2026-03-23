@@ -24,6 +24,9 @@ export const env = {
   longforQueryReportUrl:
     process.env.LONGFOR_QUERY_REPORT_URL ??
     'https://gwp0-hw.longfor.com/yunjing-prod/qd-ems-analysis/api/v1/analysis/energy/queryReport',
+  longforUserInfoUrl:
+    process.env.LONGFOR_USER_INFO_URL ??
+    'https://gwp0-hw.longfor.com/yunjing-prod/yunjing-base-server/api/v1/user/info',
   nodeEnv: process.env.NODE_ENV ?? 'development',
   supabaseAnonKey: process.env.SUPABASE_ANON_KEY ?? '',
   supabaseDbUrl: process.env.SUPABASE_DB_URL ?? process.env.DATABASE_URL ?? '',

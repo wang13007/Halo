@@ -33,6 +33,167 @@ const normalizeCastgc = (rawValue: string) => {
   return value;
 };
 
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const normalizeStringValue = (value: unknown) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || '';
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return '';
+};
+
+const getFirstNonEmptyString = (record: Record<string, unknown>, keys: string[]) => {
+  for (const key of keys) {
+    const normalized = normalizeStringValue(record[key]);
+
+    if (normalized) {
+      return normalized;
+    }
+  }
+
+  return '';
+};
+
+const buildLongforHeaders = () => {
+  const authorization = env.longforAuthorization.trim();
+  const castgc = normalizeCastgc(env.longforCastgc);
+  const gaiaApiKey = env.longforGaiaApiKey.trim();
+  const headers: Record<string, string> = {
+    Accept: 'application/json, text/plain, */*',
+  };
+
+  if (authorization) {
+    headers.authorization = authorization;
+  }
+
+  if (gaiaApiKey) {
+    headers['x-gaia-api-key'] = gaiaApiKey;
+  }
+
+  if (castgc) {
+    headers.CASTGC = castgc;
+    headers.Cookie = `CASTGC=${castgc}; account=${castgc}`;
+  }
+
+  return {
+    authorization,
+    castgc,
+    gaiaApiKey,
+    headers,
+  };
+};
+
+const hasLongforCredentials = (config: {
+  authorization: string;
+  castgc: string;
+  gaiaApiKey: string;
+}) => Boolean(config.castgc || (config.authorization && config.gaiaApiKey));
+
+const parseUpstreamResponse = async (upstreamResponse: Response) => {
+  const rawText = await upstreamResponse.text();
+
+  if (!rawText) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawText) as unknown;
+  } catch {
+    return rawText;
+  }
+};
+
+type EnergyQuickProject = {
+  channel: string;
+  name: string;
+  orgId: string;
+};
+
+type ProjectCollectContext = {
+  channel: string;
+  path: string[];
+};
+
+const projectChannelKeys = ['channel', 'projectChannel', 'orgChannel'];
+const projectNameKeys = ['name', 'projectName', 'orgName', 'orgFullName', 'label', 'title'];
+const projectIdKeys = ['orgId', 'organizationId', 'projectId', 'projectCode', 'orgCode', 'id', 'code'];
+const projectShapeKeys = [
+  'orgId',
+  'organizationId',
+  'projectId',
+  'projectCode',
+  'orgCode',
+  'projectName',
+  'orgName',
+  'orgFullName',
+];
+
+const collectEnergyQuickProjects = (
+  value: unknown,
+  projects: EnergyQuickProject[],
+  seen: Set<string>,
+  context: ProjectCollectContext = { channel: '', path: [] },
+) => {
+  if (Array.isArray(value)) {
+    value.forEach((item) => collectEnergyQuickProjects(item, projects, seen, context));
+    return;
+  }
+
+  if (!isPlainObject(value)) {
+    return;
+  }
+
+  const channel = getFirstNonEmptyString(value, projectChannelKeys) || context.channel;
+  const name = getFirstNonEmptyString(value, projectNameKeys);
+  const orgId = getFirstNonEmptyString(value, projectIdKeys);
+  const isProjectPath = context.path.some((segment) => /org|project/i.test(segment));
+  const hasProjectShape = isProjectPath || projectShapeKeys.some((key) => key in value);
+
+  if (channel === 'C2' && hasProjectShape && name && orgId) {
+    const dedupeKey = `${orgId}::${name}`;
+
+    if (!seen.has(dedupeKey)) {
+      seen.add(dedupeKey);
+      projects.push({ channel, name, orgId });
+    }
+  }
+
+  Object.entries(value).forEach(([key, childValue]) => {
+    collectEnergyQuickProjects(childValue, projects, seen, {
+      channel,
+      path: [...context.path, key],
+    });
+  });
+};
+
+const extractEnergyQuickProjects = (payload: unknown) => {
+  const projects: EnergyQuickProject[] = [];
+  collectEnergyQuickProjects(payload, projects, new Set<string>());
+  return projects.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+};
+
+const getUpstreamBusinessError = (payload: unknown) => {
+  if (!isPlainObject(payload)) {
+    return '';
+  }
+
+  const code = getFirstNonEmptyString(payload, ['code', 'status', 'errCode']);
+
+  if (!code || ['0', '200', 'success', 'SUCCESS'].includes(code)) {
+    return '';
+  }
+
+  const message = getFirstNonEmptyString(payload, ['msg', 'message', 'error', 'errorMessage']);
+  return message ? `${message} (code: ${code})` : `Upstream business error (code: ${code})`;
+};
+
 app.use(cors({ origin: resolveCorsOrigin() }));
 app.use(express.json());
 
@@ -43,6 +204,7 @@ app.get('/api', (_request, response) => {
       'GET /api/health',
       'GET /api/projects',
       'GET /api/energy/analysis',
+      'GET /api/energy/quick-projects',
       'POST /api/energy/query-report',
       'POST /api/energy/metrics',
       'POST /api/ai/chat',
@@ -161,13 +323,78 @@ app.post('/api/ai/coding', async (request, response, next) => {
   }
 });
 
+app.get('/api/energy/quick-projects', async (_request, response) => {
+  const longforConfig = buildLongforHeaders();
+
+  if (!hasLongforCredentials(longforConfig)) {
+    response.status(500).json({
+      error:
+        'Missing Longfor credentials. Configure LONGFOR_AUTHORIZATION and LONGFOR_X_GAIA_API_KEY, or configure LONGFOR_CASTGC.',
+      projects: [],
+      upstreamStatus: 500,
+      upstreamUrl: env.longforUserInfoUrl,
+    });
+    return;
+  }
+
+  try {
+    const upstreamResponse = await fetch(env.longforUserInfoUrl, {
+      headers: longforConfig.headers,
+      method: 'GET',
+    });
+    const data = await parseUpstreamResponse(upstreamResponse);
+    const upstreamBusinessError = getUpstreamBusinessError(data);
+
+    if (!upstreamResponse.ok) {
+      const upstreamMessage = isPlainObject(data)
+        ? getFirstNonEmptyString(data, ['message', 'msg', 'error'])
+        : '';
+
+      response.status(upstreamResponse.status).json({
+        error:
+          upstreamMessage ||
+          `Failed to fetch Longfor quick-query projects: ${upstreamResponse.status}`,
+        projects: [],
+        upstreamStatus: upstreamResponse.status,
+        upstreamUrl: env.longforUserInfoUrl,
+      });
+      return;
+    }
+
+    if (upstreamBusinessError) {
+      response.status(401).json({
+        error: upstreamBusinessError,
+        loginUrl: isPlainObject(data) ? getFirstNonEmptyString(data, ['loginUrl']) : '',
+        projects: [],
+        upstreamStatus: upstreamResponse.status,
+        upstreamUrl: env.longforUserInfoUrl,
+      });
+      return;
+    }
+
+    response.json({
+      projects: extractEnergyQuickProjects(data),
+      upstreamStatus: upstreamResponse.status,
+      upstreamUrl: env.longforUserInfoUrl,
+    });
+  } catch (error) {
+    response.status(502).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : 'Failed to fetch Longfor quick-query projects.',
+      projects: [],
+      upstreamStatus: 502,
+      upstreamUrl: env.longforUserInfoUrl,
+    });
+  }
+});
+
 app.post('/api/energy/query-report', async (request, response) => {
-  const authorization = env.longforAuthorization.trim();
-  const castgc = normalizeCastgc(env.longforCastgc);
-  const gaiaApiKey = env.longforGaiaApiKey.trim();
+  const longforConfig = buildLongforHeaders();
   const payload = (request.body?.payload ?? request.body ?? {}) as Record<string, unknown>;
 
-  if ((!authorization || !gaiaApiKey) && !castgc) {
+  if (!hasLongforCredentials(longforConfig)) {
     response.status(500).json({
       ok: false,
       upstreamStatus: 500,
@@ -180,38 +407,15 @@ app.post('/api/energy/query-report', async (request, response) => {
   }
 
   try {
-    const headers: Record<string, string> = {
-      Accept: 'application/json, text/plain, */*',
-      'Content-Type': 'application/json',
-    };
-
-    if (authorization) {
-      headers.authorization = authorization;
-    }
-
-    if (gaiaApiKey) {
-      headers['x-gaia-api-key'] = gaiaApiKey;
-    }
-
-    if (castgc) {
-      headers.CASTGC = castgc;
-      headers.Cookie = `CASTGC=${castgc}`;
-    }
-
     const upstreamResponse = await fetch(env.longforQueryReportUrl, {
       method: 'POST',
-      headers,
+      headers: {
+        ...longforConfig.headers,
+        'Content-Type': 'application/json',
+      },
       body: JSON.stringify(payload),
     });
-
-    const rawText = await upstreamResponse.text();
-    let data: unknown = rawText;
-
-    try {
-      data = rawText ? JSON.parse(rawText) : null;
-    } catch {
-      data = rawText;
-    }
+    const data = await parseUpstreamResponse(upstreamResponse);
 
     response.status(upstreamResponse.status).json({
       ok: upstreamResponse.ok,

@@ -26,8 +26,32 @@ const sizeButtonOptions: WidgetSize[] = ['small', 'medium', 'large'];
 
 const widgetHeightClassMap: Record<WidgetSize, string> = {
   large: 'min-h-[220px]',
-  medium: 'min-h-[210px]',
-  small: 'min-h-[180px]',
+  medium: 'min-h-[196px]',
+  small: 'min-h-[164px]',
+};
+
+const widgetTitleClassMap: Record<WidgetSize, string> = {
+  large: 'text-[26px]',
+  medium: 'text-[22px]',
+  small: 'text-lg',
+};
+
+const widgetValueClassMap: Record<WidgetSize, string> = {
+  large: 'text-sm',
+  medium: 'text-xs',
+  small: 'text-xs',
+};
+
+const widgetItemLimitMap: Record<WidgetSize, number> = {
+  large: 4,
+  medium: 3,
+  small: 2,
+};
+
+const widgetItemClassMap: Record<WidgetSize, string> = {
+  large: 'rounded-[16px] px-3 py-2.5 text-sm leading-5',
+  medium: 'rounded-[16px] px-3 py-2 text-sm leading-5',
+  small: 'rounded-[16px] px-3 py-2 text-xs leading-5',
 };
 
 const sizeDescriptionMap: Record<WidgetSize, string> = {
@@ -294,49 +318,60 @@ export const DashboardHome = ({
         </div>
       </div>
 
-      <div className="grid min-h-0 flex-1 auto-rows-fr gap-4 overflow-y-auto pr-1 xl:grid-cols-12 xl:overflow-hidden xl:pr-0">
-        {activeWidgets.map((widget) => (
-          <article
-            key={widget.id}
-            className={`${widgetSizeClassMap[widget.size]} ${widgetHeightClassMap[widget.size]} rounded-[26px] border p-5 shadow-sm ${cardSurface}`}
-          >
-            <div
-              className={`h-full rounded-[22px] bg-gradient-to-br ${widget.accent} p-4`}
+      <div className="grid min-h-0 flex-1 content-start auto-rows-fr gap-4 overflow-y-auto pr-1 md:grid-cols-6 xl:grid-cols-12 xl:overflow-hidden xl:pr-0">
+        {activeWidgets.map((widget) => {
+          const visibleItems = widget.items.slice(0, widgetItemLimitMap[widget.size]);
+          const hiddenItemsCount = Math.max(widget.items.length - visibleItems.length, 0);
+
+          return (
+            <article
+              key={widget.id}
+              className={`${widgetSizeClassMap[widget.size]} ${widgetHeightClassMap[widget.size]} overflow-hidden rounded-[26px] border p-4 shadow-sm ${cardSurface}`}
             >
-              <div className="flex h-full flex-col">
+              <div className={`flex h-full flex-col rounded-[22px] bg-gradient-to-br ${widget.accent} p-4`}>
                 <div className="flex items-start justify-between gap-3">
-                  <div>
-                    <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
+                  <div className="min-w-0">
+                    <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
                       {widgetSizeLabelMap[widget.size]}组件
                     </div>
-                    <h2 className={`mt-2 text-xl font-black tracking-tight ${textPrimary}`}>
+                    <h2
+                      className={`mt-2 truncate font-black tracking-tight ${widgetTitleClassMap[widget.size]} ${textPrimary}`}
+                    >
                       {widget.title}
                     </h2>
                   </div>
-                  <div className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
+                  <div
+                    className={`shrink-0 rounded-full bg-blue-500/10 px-3 py-1 font-bold text-blue-600 ${widgetValueClassMap[widget.size]}`}
+                  >
                     {widget.value}
                   </div>
                 </div>
 
-                <p className={`mt-3 text-sm leading-6 ${textSecondary}`}>{widget.description}</p>
-                <div className={`mt-4 text-sm font-semibold ${textPrimary}`}>{widget.helper}</div>
+                <p className={`mt-3 text-sm leading-5 ${textSecondary}`}>{widget.description}</p>
+                <div className={`mt-3 text-sm font-semibold leading-5 ${textPrimary}`}>{widget.helper}</div>
 
-                <div className="mt-4 grid gap-2">
-                  {widget.items.map((item) => (
+                <div className="mt-3 grid gap-2">
+                  {visibleItems.map((item) => (
                     <div
                       key={item}
-                      className={`rounded-[18px] px-3 py-2 text-sm ${
-                        isDarkMode ? 'bg-white/8 text-slate-200' : 'bg-white/70 text-slate-700'
+                      className={`${widgetItemClassMap[widget.size]} ${
+                        isDarkMode ? 'bg-white/8 text-slate-200' : 'bg-white/80 text-slate-700'
                       }`}
                     >
                       {item}
                     </div>
                   ))}
                 </div>
+
+                {hiddenItemsCount > 0 && (
+                  <div className="mt-auto pt-3 text-xs font-medium text-slate-500">
+                    还有 {hiddenItemsCount} 项内容
+                  </div>
+                )}
               </div>
-            </div>
-          </article>
-        ))}
+            </article>
+          );
+        })}
       </div>
 
       {editorOpen && (
@@ -571,77 +606,81 @@ export const DashboardHome = ({
                       把小组件拖到这里，开始搭建当前看板。
                     </div>
                   ) : (
-                    <div className="grid auto-rows-fr gap-4 xl:grid-cols-12">
-                      {activeWidgets.map((widget) => (
-                        <div
-                          key={widget.id}
-                          draggable
-                          onDragStart={(event) =>
-                            event.dataTransfer.setData(
-                              'application/json',
-                              JSON.stringify({ type: 'canvas', widgetId: widget.id } satisfies DragPayload),
-                            )
-                          }
-                          onDragOver={(event) => {
-                            event.preventDefault();
-                            setDragOverWidgetId(widget.id);
-                          }}
-                          onDragLeave={() => {
-                            if (dragOverWidgetId === widget.id) {
-                              setDragOverWidgetId(null);
+                    <div className="grid auto-rows-fr gap-4 md:grid-cols-6 xl:grid-cols-12">
+                      {activeWidgets.map((widget) => {
+                        const previewItems = widget.items.slice(0, widgetItemLimitMap[widget.size]);
+
+                        return (
+                          <div
+                            key={widget.id}
+                            draggable
+                            onDragStart={(event) =>
+                              event.dataTransfer.setData(
+                                'application/json',
+                                JSON.stringify({ type: 'canvas', widgetId: widget.id } satisfies DragPayload),
+                              )
                             }
-                          }}
-                          onDrop={(event) => handleCanvasDrop(event, widget.id)}
-                          className={`${widgetSizeClassMap[widget.size]} ${
-                            dragOverWidgetId === widget.id ? 'ring-2 ring-blue-500/40' : ''
-                          } ${widgetHeightClassMap[widget.size]} rounded-[24px] border p-4 shadow-sm ${cardSurface}`}
-                        >
-                          <div className="flex h-full flex-col">
-                            <div className="flex items-start justify-between gap-3">
-                              <div>
-                                <div className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-                                  {widgetSizeLabelMap[widget.size]}组件
+                            onDragOver={(event) => {
+                              event.preventDefault();
+                              setDragOverWidgetId(widget.id);
+                            }}
+                            onDragLeave={() => {
+                              if (dragOverWidgetId === widget.id) {
+                                setDragOverWidgetId(null);
+                              }
+                            }}
+                            onDrop={(event) => handleCanvasDrop(event, widget.id)}
+                            className={`${widgetSizeClassMap[widget.size]} ${
+                              dragOverWidgetId === widget.id ? 'ring-2 ring-blue-500/40' : ''
+                            } ${widgetHeightClassMap[widget.size]} overflow-hidden rounded-[24px] border p-4 shadow-sm ${cardSurface}`}
+                          >
+                            <div className="flex h-full flex-col">
+                              <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                  <div className="text-[11px] font-bold uppercase tracking-[0.22em] text-slate-400">
+                                    {widgetSizeLabelMap[widget.size]}组件
+                                  </div>
+                                  <div className={`mt-2 truncate text-base font-black ${textPrimary}`}>
+                                    {widget.title}
+                                  </div>
                                 </div>
-                                <div className={`mt-2 text-lg font-black ${textPrimary}`}>
-                                  {widget.title}
-                                </div>
+                                <GripVertical size={16} className="shrink-0 text-slate-400" />
                               </div>
-                              <GripVertical size={16} className="text-slate-400" />
-                            </div>
 
-                            <div className={`mt-3 text-sm leading-6 ${textSecondary}`}>
-                              {widget.description}
-                            </div>
+                              <div className={`mt-3 text-sm leading-5 ${textSecondary}`}>
+                                {widget.description}
+                              </div>
 
-                            <div className="mt-4 grid gap-2">
-                              {widget.items.slice(0, widget.size === 'small' ? 2 : 3).map((item) => (
-                                <div
-                                  key={item}
-                                  className={`rounded-[16px] px-3 py-2 text-sm ${
-                                    isDarkMode
-                                      ? 'bg-white/8 text-slate-200'
-                                      : 'bg-slate-50 text-slate-700'
-                                  }`}
+                              <div className="mt-3 grid gap-2">
+                                {previewItems.map((item) => (
+                                  <div
+                                    key={item}
+                                    className={`rounded-[16px] px-3 py-2 text-sm leading-5 ${
+                                      isDarkMode
+                                        ? 'bg-white/8 text-slate-200'
+                                        : 'bg-slate-50 text-slate-700'
+                                    }`}
+                                  >
+                                    {item}
+                                  </div>
+                                ))}
+                              </div>
+
+                              <div className="mt-auto flex items-center justify-between pt-4">
+                                <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
+                                  {widget.value}
+                                </span>
+                                <button
+                                  onClick={() => handleLibraryToggle(widget.id)}
+                                  className={`rounded-full px-3 py-1 text-xs font-bold ${mutedSurface} ${textPrimary}`}
                                 >
-                                  {item}
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="mt-auto flex items-center justify-between pt-4">
-                              <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
-                                {widget.value}
-                              </span>
-                              <button
-                                onClick={() => handleLibraryToggle(widget.id)}
-                                className={`rounded-full px-3 py-1 text-xs font-bold ${mutedSurface} ${textPrimary}`}
-                              >
-                                移除
-                              </button>
+                                  移除
+                                </button>
+                              </div>
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   )}
                 </div>
