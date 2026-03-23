@@ -21,26 +21,37 @@ type PageId = 'apps' | 'chat' | 'config' | 'dashboard' | 'subscription';
 
 const pageMetaMap: Record<PageId, { description: string; title: string }> = {
   apps: {
-    description: '预置应用与扩展能力集中呈现，适合按业务视角快速进入。',
+    description: '按收藏应用、我的应用和应用商场管理你的应用能力。',
     title: '应用中心',
   },
   chat: {
-    description: '以 Web 对话工作台统一承接能耗查询、报告生成和日常运营分析。',
+    description: '默认空白起手，按 ChatGPT 式交互进行查询、分析和总结。',
     title: '智能对话',
   },
   config: {
-    description: '点击系统卡片即可查看后端接入状态、接口地址和数据库准备情况。',
+    description: '从系统卡片进入详情窗口，集中查看接入状态、接口和数据准备情况。',
     title: '系统配置',
   },
   dashboard: {
-    description: '面向 Web 管理端重新整理布局，保留重点数据、减少无效留白。',
-    title: '运营总览',
+    description: '仅保留核心小组件，作为日常使用的轻量化运营看板。',
+    title: '看板',
   },
   subscription: {
-    description: '基础版与高级版按月、按季、按年统一展示，差异清晰可比较。',
+    description: '基础版与高级版支持按月、按季、按年订阅。',
     title: '订阅方案',
   },
 };
+
+const navigationItems: Array<{
+  icon: React.ComponentType<{ className?: string; size?: number }>;
+  id: Exclude<PageId, 'subscription'>;
+  label: string;
+}> = [
+  { icon: LayoutDashboard, id: 'dashboard', label: '看板' },
+  { icon: MessageSquare, id: 'chat', label: '对话' },
+  { icon: Grid2x2, id: 'apps', label: '应用中心' },
+  { icon: Settings, id: 'config', label: '配置' },
+];
 
 const App = () => {
   const [activeTab, setActiveTab] = useState<PageId>('dashboard');
@@ -65,27 +76,28 @@ const App = () => {
   const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
   const pageBackground = isDarkMode ? 'bg-[#06111f]' : 'bg-[#f4f7fb]';
   const sidebarSurface = isDarkMode
-    ? 'border-white/10 bg-slate-950/80'
-    : 'border-slate-200/70 bg-white/82';
+    ? 'border-white/10 bg-slate-950/82'
+    : 'border-slate-200/70 bg-white/84';
   const cardSurface = isDarkMode
     ? 'border-white/10 bg-slate-900/70'
     : 'border-white/80 bg-white/84';
   const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
   const pageMeta = pageMetaMap[activeTab];
+  const showHeaderAction = activeTab === 'dashboard' || activeTab === 'chat';
 
   return (
-    <div className={`min-h-screen ${pageBackground} transition-colors duration-300`}>
+    <div className={`h-screen overflow-hidden ${pageBackground} transition-colors duration-300`}>
       <div className="pointer-events-none fixed inset-0 overflow-hidden">
         <div className="absolute -left-20 top-0 h-72 w-72 rounded-full bg-blue-400/15 blur-[90px]" />
         <div className="absolute right-0 top-28 h-80 w-80 rounded-full bg-cyan-300/10 blur-[110px]" />
         <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-emerald-300/10 blur-[100px]" />
       </div>
 
-      <div className="relative flex min-h-screen">
+      <div className="relative flex h-full overflow-hidden">
         <aside
           className={`${
-            isSidebarExpanded ? 'w-[248px]' : 'w-[92px]'
-          } shrink-0 border-r px-4 pb-6 pt-8 transition-all duration-300 ${sidebarSurface}`}
+            isSidebarExpanded ? 'w-[252px]' : 'w-[92px]'
+          } flex h-full shrink-0 flex-col border-r px-4 pb-5 pt-6 transition-all duration-300 ${sidebarSurface}`}
         >
           <div className="flex items-center justify-between gap-3 px-2">
             <div className="flex items-center gap-3 overflow-hidden">
@@ -108,12 +120,7 @@ const App = () => {
           </div>
 
           <nav className="mt-8 space-y-2">
-            {[
-              { icon: LayoutDashboard, id: 'dashboard', label: '总览' },
-              { icon: MessageSquare, id: 'chat', label: '对话' },
-              { icon: Grid2x2, id: 'apps', label: '应用' },
-              { icon: Settings, id: 'config', label: '配置' },
-            ].map((item) => (
+            {navigationItems.map((item) => (
               <NavItem
                 key={item.id}
                 active={activeTab === item.id}
@@ -121,12 +128,12 @@ const App = () => {
                 icon={item.icon}
                 isDarkMode={isDarkMode}
                 label={item.label}
-                onClick={() => setActiveTab(item.id as PageId)}
+                onClick={() => setActiveTab(item.id)}
               />
             ))}
           </nav>
 
-          <div className="mt-auto pt-8">
+          <div className="mt-auto pt-6">
             <div className="relative" ref={userMenuRef}>
               <button
                 onClick={() => setShowUserMenu((previous) => !previous)}
@@ -174,41 +181,37 @@ const App = () => {
           </div>
         </aside>
 
-        <main className="min-w-0 flex-1">
-          <header className="px-8 pb-4 pt-8 lg:px-10">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
+          <header className="shrink-0 px-6 pb-3 pt-6 lg:px-8">
+            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
                   <Sparkles size={14} />
                   Halo Web
                 </div>
-                <h1 className={`mt-4 text-3xl font-black tracking-tight ${textPrimary}`}>
+                <h1 className={`mt-3 text-2xl font-black tracking-tight lg:text-[30px] ${textPrimary}`}>
                   {pageMeta.title}
                 </h1>
-                <p className={`mt-2 text-sm leading-7 ${textSecondary}`}>{pageMeta.description}</p>
+                <p className={`mt-2 max-w-3xl text-sm leading-6 ${textSecondary}`}>
+                  {pageMeta.description}
+                </p>
               </div>
-              <div className="flex flex-wrap gap-3">
-                {activeTab !== 'subscription' && (
+
+              {showHeaderAction && (
+                <div className="flex gap-3">
                   <button
-                    onClick={() => setActiveTab('subscription')}
-                    className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
+                    onClick={() => setActiveTab('config')}
+                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                   >
-                    <Wallet size={16} />
-                    查看订阅
+                    <Settings size={16} />
+                    系统配置
                   </button>
-                )}
-                <button
-                  onClick={() => setActiveTab('config')}
-                  className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-                >
-                  <Settings size={16} />
-                  系统配置
-                </button>
-              </div>
+                </div>
+              )}
             </div>
           </header>
 
-          <div className="px-8 pb-8 lg:px-10">
+          <div className="min-h-0 flex-1 overflow-hidden px-6 pb-6 lg:px-8">
             {activeTab === 'dashboard' && <DashboardHome isDarkMode={isDarkMode} />}
             {activeTab === 'chat' && <ChatWorkspace isDarkMode={isDarkMode} />}
             {activeTab === 'apps' && <AppsShowcase isDarkMode={isDarkMode} />}
@@ -228,14 +231,7 @@ const NavItem: React.FC<{
   isDarkMode: boolean;
   label: string;
   onClick: () => void;
-}> = ({
-  active,
-  expanded,
-  icon: Icon,
-  isDarkMode,
-  label,
-  onClick,
-}) => (
+}> = ({ active, expanded, icon: Icon, isDarkMode, label, onClick }) => (
   <button
     onClick={onClick}
     className={`flex w-full items-center gap-3 rounded-[22px] px-3 py-3 text-sm font-semibold transition ${

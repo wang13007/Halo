@@ -1,6 +1,39 @@
 import React from 'react';
-import { Bot, Database, Server, Sparkles } from 'lucide-react';
-import { EnergyAnalysis } from './EnergyAnalysis';
+import {
+  Activity,
+  AppWindow,
+  Bot,
+  Database,
+  Radar,
+  ShieldCheck,
+  Sparkles,
+  Zap,
+} from 'lucide-react';
+
+const summaryWidgets = [
+  { helper: '较昨日 +5.2%', icon: Zap, tone: 'text-blue-600', value: '1,245 kWh', label: '今日能耗' },
+  { helper: '3 个系统在线', icon: Database, tone: 'text-emerald-600', value: '稳定', label: '数据接入' },
+  { helper: '2 项待处理', icon: ShieldCheck, tone: 'text-amber-600', value: '4 条', label: '待办提醒' },
+  { helper: '默认展示', icon: AppWindow, tone: 'text-violet-600', value: '6 个', label: '收藏应用' },
+];
+
+const focusItems = [
+  '暖通空调在 13:00 后负荷继续抬升，建议优先复核运行策略。',
+  'IBMS 与 EMS 已在线，Supabase Schema 仍待继续初始化。',
+  '应用中心默认切到收藏应用，便于高频能力快速进入。',
+];
+
+const energyDistribution = [
+  { label: '暖通空调', progress: 74 },
+  { label: '照明插座', progress: 56 },
+  { label: '动力设备', progress: 43 },
+];
+
+const recentActions = [
+  '补全高级版的自定义小组件和自定义应用能力',
+  '完成 Supabase 远端建表后同步刷新配置状态',
+  '将高频应用固定到收藏应用标签顶部',
+];
 
 export const DashboardHome = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
@@ -11,67 +44,143 @@ export const DashboardHome = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-5 lg:grid-cols-[minmax(0,1.3fr)_minmax(300px,0.7fr)]">
-        <section
-          className={`relative overflow-hidden rounded-[32px] border p-7 shadow-sm ${cardSurface}`}
+    <div className="grid h-full auto-rows-fr gap-4 overflow-y-auto pr-1 xl:grid-cols-12 xl:overflow-hidden xl:pr-0">
+      {summaryWidgets.map((widget) => (
+        <article
+          key={widget.label}
+          className={`rounded-[26px] border p-4 shadow-sm xl:col-span-3 ${cardSurface}`}
         >
-          <div className="absolute inset-0 bg-gradient-to-br from-blue-600/10 via-cyan-500/5 to-transparent" />
-          <div className="relative">
-            <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
-              <Sparkles size={14} />
-              Web 端总览
+          <div className="flex items-start justify-between">
+            <div>
+              <div className="text-xs uppercase tracking-[0.18em] text-slate-400">{widget.label}</div>
+              <div className={`mt-2 text-2xl font-black tracking-tight ${textPrimary}`}>
+                {widget.value}
+              </div>
             </div>
-            <h2 className={`mt-4 text-3xl font-black tracking-tight ${textPrimary}`}>
-              Halo 已切换为更轻的 Web 管理界面
-            </h2>
-            <p className={`mt-3 max-w-2xl text-sm leading-7 ${textSecondary}`}>
-              外层大圆角容器已经移除，页面留白、模块密度和顶部层级都重新梳理成更适合 Web 端长期使用的结构。
-            </p>
-            <div className="mt-6 flex flex-wrap gap-3">
-              {[
-                '顶部结构更轻',
-                '历史对话按钮回到头部',
-                '配置页统一走详情窗口',
-              ].map((item) => (
-                <span
-                  key={item}
-                  className={`rounded-full px-4 py-2 text-sm ${
-                    isDarkMode ? 'bg-white/8 text-slate-200' : 'bg-slate-100 text-slate-600'
-                  }`}
-                >
-                  {item}
-                </span>
-              ))}
+            <div className={`rounded-2xl p-3 ${mutedSurface}`}>
+              <widget.icon size={18} className={widget.tone} />
             </div>
           </div>
-        </section>
+          <div className={`mt-4 text-sm ${textSecondary}`}>{widget.helper}</div>
+        </article>
+      ))}
 
-        <section className="grid gap-4">
-          {[
-            { icon: Bot, label: '智能对话', tone: 'text-violet-600', value: 'Web 工作台' },
-            { icon: Database, label: '数据层', tone: 'text-emerald-600', value: 'Supabase' },
-            { icon: Server, label: '接口中心', tone: 'text-blue-600', value: 'Express API' },
-          ].map((item) => (
-            <article
-              key={item.label}
-              className={`rounded-[28px] border p-5 shadow-sm ${cardSurface}`}
+      <section className={`rounded-[26px] border p-4 shadow-sm xl:col-span-5 ${cardSurface}`}>
+        <div className="flex items-center gap-2">
+          <Sparkles size={15} className="text-blue-600" />
+          <h2 className={`text-xs font-black uppercase tracking-[0.22em] ${textSecondary}`}>
+            今日焦点
+          </h2>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {focusItems.map((item) => (
+            <div
+              key={item}
+              className={`rounded-[20px] p-3 text-sm leading-6 ${
+                isDarkMode ? 'bg-white/5 text-slate-200' : 'bg-slate-50 text-slate-700'
+              }`}
             >
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm text-slate-500">{item.label}</div>
-                  <div className={`mt-2 text-xl font-black ${textPrimary}`}>{item.value}</div>
-                </div>
-                <div className={`rounded-2xl p-3 ${mutedSurface}`}>
-                  <item.icon size={20} className={item.tone} />
-                </div>
-              </div>
-            </article>
+              {item}
+            </div>
           ))}
-        </section>
-      </div>
+        </div>
+      </section>
 
-      <EnergyAnalysis isDarkMode={isDarkMode} />
+      <section className={`rounded-[26px] border p-4 shadow-sm xl:col-span-3 ${cardSurface}`}>
+        <div className="flex items-center justify-between">
+          <h2 className={`text-xs font-black uppercase tracking-[0.22em] ${textSecondary}`}>
+            运行节奏
+          </h2>
+          <div className={`rounded-2xl p-2.5 ${mutedSurface}`}>
+            <Activity size={16} className="text-emerald-600" />
+          </div>
+        </div>
+        <div className="mt-4 space-y-3">
+          {[
+            { label: '今日对话', value: '12 次' },
+            { label: '生成报告', value: '4 份' },
+            { label: '待处理告警', value: '2 条' },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between text-sm">
+              <span className={textSecondary}>{item.label}</span>
+              <span className={`font-bold ${textPrimary}`}>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className={`rounded-[26px] border p-4 shadow-sm xl:col-span-4 ${cardSurface}`}>
+        <div className="flex items-center justify-between">
+          <h2 className={`text-xs font-black uppercase tracking-[0.22em] ${textSecondary}`}>
+            本周能耗分布
+          </h2>
+          <div className={`rounded-2xl p-2.5 ${mutedSurface}`}>
+            <Zap size={16} className="text-amber-500" />
+          </div>
+        </div>
+        <div className="mt-4 space-y-3">
+          {energyDistribution.map((item) => (
+            <div key={item.label}>
+              <div className="flex items-center justify-between text-sm">
+                <span className={textPrimary}>{item.label}</span>
+                <span className={textSecondary}>{item.progress}%</span>
+              </div>
+              <div className={`mt-2 h-2 overflow-hidden rounded-full ${mutedSurface}`}>
+                <div
+                  className="h-full rounded-full bg-gradient-to-r from-blue-600 to-cyan-400"
+                  style={{ width: `${item.progress}%` }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className={`rounded-[26px] border p-4 shadow-sm xl:col-span-4 ${cardSurface}`}>
+        <div className="flex items-center justify-between">
+          <h2 className={`text-xs font-black uppercase tracking-[0.22em] ${textSecondary}`}>
+            接入概览
+          </h2>
+          <div className={`rounded-2xl p-2.5 ${mutedSurface}`}>
+            <Radar size={16} className="text-blue-600" />
+          </div>
+        </div>
+        <div className="mt-4 space-y-3">
+          {[
+            { label: 'EMS 系统', value: '已联通' },
+            { label: 'IBMS 系统', value: '已登记' },
+            { label: 'Supabase', value: '待建表' },
+          ].map((item) => (
+            <div key={item.label} className="flex items-center justify-between text-sm">
+              <span className={textSecondary}>{item.label}</span>
+              <span className={`font-bold ${textPrimary}`}>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      <section className={`rounded-[26px] border p-4 shadow-sm xl:col-span-4 ${cardSurface}`}>
+        <div className="flex items-center justify-between">
+          <h2 className={`text-xs font-black uppercase tracking-[0.22em] ${textSecondary}`}>
+            最近动作
+          </h2>
+          <div className={`rounded-2xl p-2.5 ${mutedSurface}`}>
+            <Bot size={16} className="text-violet-600" />
+          </div>
+        </div>
+        <div className="mt-4 grid gap-3">
+          {recentActions.map((item) => (
+            <div
+              key={item}
+              className={`rounded-[18px] p-3 text-sm leading-6 ${
+                isDarkMode ? 'bg-white/5 text-slate-200' : 'bg-slate-50 text-slate-700'
+              }`}
+            >
+              {item}
+            </div>
+          ))}
+        </div>
+      </section>
     </div>
   );
 };

@@ -11,59 +11,59 @@ import {
 } from 'date-fns';
 
 export type ChatQueryForm = {
-  project: string;
-  orgId: string;
   energyType: string;
-  timeRange: string;
   interval: string;
-  queryName: string;
+  orgId: string;
   pageNum: number;
   pageSize: number;
+  project: string;
+  queryName: string;
+  timeRange: string;
 };
 
 export type QueryReportProxyResponse = {
-  ok: boolean;
-  upstreamStatus: number;
-  upstreamUrl: string;
-  requestPayload: Record<string, unknown>;
   data?: unknown;
   message?: string;
+  ok: boolean;
+  requestPayload: Record<string, unknown>;
+  upstreamStatus: number;
+  upstreamUrl: string;
 };
 
 const energyTypeCodeMap: Record<string, string> = {
-  电: 'electricity',
   水: 'water',
+  电: 'electricity',
   燃气: 'gas',
 };
 
 const queryTypeCodeMap: Record<string, number> = {
-  '1小时': 1,
   '1天': 2,
+  '1小时': 1,
 };
 
 function resolveTimeRange(timeRange: string, now = new Date()) {
   if (timeRange === '本周') {
     return {
-      start: startOfWeek(now, { weekStartsOn: 1 }),
       end: endOfWeek(now, { weekStartsOn: 1 }),
+      start: startOfWeek(now, { weekStartsOn: 1 }),
     };
   }
 
   if (timeRange === '本月') {
     return {
-      start: startOfMonth(now),
       end: endOfMonth(now),
+      start: startOfMonth(now),
     };
   }
 
   return {
-    start: startOfDay(now),
     end: endOfDay(now),
+    start: startOfDay(now),
   };
 }
 
 export function buildEnergyQueryPayload(form: ChatQueryForm) {
-  const { start, end } = resolveTimeRange(form.timeRange);
+  const { end, start } = resolveTimeRange(form.timeRange);
   const startAt = form.interval === '1小时' ? startOfHour(start).getTime() : start.getTime();
   const endAt = form.interval === '1小时' ? endOfHour(end).getTime() : end.getTime();
   const queryType = queryTypeCodeMap[form.interval] ?? 1;

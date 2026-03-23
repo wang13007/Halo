@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Database, Lock, Server, Sparkles, X, Zap } from 'lucide-react';
+import { Database, Server, Sparkles, X, Zap } from 'lucide-react';
 import { api, type HealthResponse, type Integration, type Project, type Report } from '../lib/api';
 
 type RuntimeState = {
@@ -31,8 +31,8 @@ const systemCards: SystemCard[] = [
       { desc: '本地 queryReport 代理接口', method: 'POST', path: '/api/energy/query-report' },
       { desc: '写入能耗数据', method: 'POST', path: '/api/energy/metrics' },
     ],
-    description: '用于承接 Web 端的能耗分析、趋势统计与报表查询。',
-    detail: '适合接入 EMS 类平台，当前前端能耗页和对话查询都会优先读取这里的能力。',
+    description: '承接能耗分析、趋势统计和报表查询。',
+    detail: '前端能耗页与对话查询都会优先使用这里的 EMS 能力。',
     icon: Zap,
     id: 'ems',
     integrationType: 'ems',
@@ -44,10 +44,10 @@ const systemCards: SystemCard[] = [
     apiList: [
       { desc: '设备状态聚合', method: 'GET', path: '/api/integrations' },
       { desc: '系统接入信息读取', method: 'GET', path: '/api/projects' },
-      { desc: '健康检查', method: 'GET', path: '/api/health' },
+      { desc: '后端健康检查', method: 'GET', path: '/api/health' },
     ],
-    description: '适合楼宇、设备、监控类系统的接入状态查看。',
-    detail: '后端接入状态已经移到卡片详情窗口展示，配置页本身不再长期放置独立状态卡片。',
+    description: '适合楼宇、设备与监控类系统的接入查看。',
+    detail: '通过详情窗口集中查看接入记录、接口与状态信息。',
     icon: Server,
     id: 'ibms',
     integrationType: 'ibms',
@@ -61,8 +61,8 @@ const systemCards: SystemCard[] = [
       { desc: '项目数据读取', method: 'GET', path: '/api/projects' },
       { desc: '报表数据读取', method: 'GET', path: '/api/reports' },
     ],
-    description: '负责持久化项目、报表、系统接入和能耗明细。',
-    detail: '当前项目已接入 Supabase API，但数据库 Schema 仍取决于远端建表是否完成。',
+    description: '负责项目、报表、系统接入和能耗明细的持久化。',
+    detail: '当前 API 已接入，Schema 是否可用取决于远端建表是否完成。',
     icon: Database,
     id: 'supabase',
     name: 'Supabase 数据层',
@@ -113,11 +113,10 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
       }
 
       const errors: string[] = [];
+
       if (healthResult.status === 'rejected') {
         errors.push(
-          healthResult.reason instanceof Error
-            ? healthResult.reason.message
-            : '健康检查读取失败',
+          healthResult.reason instanceof Error ? healthResult.reason.message : '健康检查读取失败',
         );
       }
       if (integrationsResult.status === 'rejected') {
@@ -129,16 +128,12 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
       }
       if (reportsResult.status === 'rejected') {
         errors.push(
-          reportsResult.reason instanceof Error
-            ? reportsResult.reason.message
-            : '报表读取失败',
+          reportsResult.reason instanceof Error ? reportsResult.reason.message : '报表读取失败',
         );
       }
       if (projectsResult.status === 'rejected') {
         errors.push(
-          projectsResult.reason instanceof Error
-            ? projectsResult.reason.message
-            : '项目读取失败',
+          projectsResult.reason instanceof Error ? projectsResult.reason.message : '项目读取失败',
         );
       }
 
@@ -160,13 +155,6 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
     };
   }, [selectedSystem]);
 
-  const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
-  const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
-  const cardSurface = isDarkMode
-    ? 'border-white/10 bg-slate-900/70'
-    : 'border-white/80 bg-white/84';
-  const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
-
   const matchingIntegrations = useMemo(() => {
     if (!selectedSystem) {
       return [];
@@ -183,14 +171,21 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
     );
   }, [runtimeState.integrations, selectedSystem]);
 
+  const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
+  const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
+  const cardSurface = isDarkMode
+    ? 'border-white/10 bg-slate-900/70'
+    : 'border-white/80 bg-white/84';
+  const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
+
   return (
-    <div className="space-y-6">
-      <section className="grid gap-5 lg:grid-cols-3">
+    <div className="flex h-full flex-col justify-start overflow-y-auto pr-1 xl:overflow-hidden xl:pr-0">
+      <section className="grid gap-4 lg:grid-cols-3">
         {systemCards.map((system) => (
           <button
             key={system.id}
             onClick={() => setSelectedSystemId(system.id)}
-            className={`group relative overflow-hidden rounded-[30px] border p-6 text-left shadow-sm transition hover:-translate-y-1 ${cardSurface}`}
+            className={`group relative overflow-hidden rounded-[28px] border p-5 text-left shadow-sm transition hover:-translate-y-1 ${cardSurface}`}
           >
             <div className={`absolute inset-0 bg-gradient-to-br ${system.accent}`} />
             <div className="relative">
@@ -199,7 +194,7 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                   <system.icon size={20} className="text-blue-600" />
                 </div>
                 <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
-                  点击查看
+                  查看详情
                 </span>
               </div>
               <h3 className={`mt-5 text-xl font-black ${textPrimary}`}>{system.name}</h3>
@@ -207,20 +202,6 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
             </div>
           </button>
         ))}
-      </section>
-
-      <section className={`rounded-[30px] border p-6 shadow-sm ${cardSurface}`}>
-        <div className="flex items-start gap-4">
-          <div className={`rounded-2xl p-3 ${mutedSurface}`}>
-            <Lock size={20} className="text-amber-600" />
-          </div>
-          <div>
-            <h3 className={`text-lg font-black ${textPrimary}`}>配置页已改为“卡片进入详情窗口”</h3>
-            <p className={`mt-2 text-sm leading-7 ${textSecondary}`}>
-              页面里已经移除了“新增系统接入”卡片。后端接入状态会在点击对应系统卡片后，以详情窗口的方式集中展示，页面主区域只保留系统入口，更整洁也更适合 Web 端。
-            </p>
-          </div>
-        </div>
       </section>
 
       {selectedSystem && (
@@ -259,14 +240,18 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                       value={runtimeState.isLoading ? '读取中' : runtimeState.health?.status ?? '未知'}
                     />
                     <StatusCard
-                      label="Schema"
+                      label={selectedSystem.id === 'supabase' ? 'Schema' : '接入准备'}
                       tone="emerald"
                       value={
                         runtimeState.isLoading
                           ? '读取中'
-                          : runtimeState.health?.database.schemaReady
-                            ? '已初始化'
-                            : '未初始化'
+                          : selectedSystem.id === 'supabase'
+                            ? runtimeState.health?.database.schemaReady
+                              ? '已初始化'
+                              : '未初始化'
+                            : matchingIntegrations.length > 0
+                              ? '已登记'
+                              : '待登记'
                       }
                     />
                     <StatusCard
@@ -278,8 +263,8 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
                   <div className="mt-5 rounded-[24px] bg-blue-500/5 p-4 text-sm leading-7 text-slate-500">
                     {runtimeState.error
-                      ? `当前读取存在问题：${runtimeState.error}`
-                      : '系统卡片点击后会在窗口中统一展示后端接入状态，不再占用配置页主区域。'}
+                      ? `当前读取存在异常：${runtimeState.error}`
+                      : '状态数据已集中到详情窗口中展示，主页面仅保留系统入口卡片。'}
                   </div>
                 </section>
 
@@ -335,6 +320,47 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                           <div className={`font-semibold ${textPrimary}`}>{apiItem.path}</div>
                           <div className={`text-xs ${textSecondary}`}>{apiItem.desc}</div>
                         </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </section>
+
+              <section className={`mt-5 rounded-[28px] border p-5 ${cardSurface}`}>
+                <div className="flex items-center gap-2">
+                  <Server size={16} className="text-violet-600" />
+                  <h3 className={`text-sm font-black tracking-[0.22em] uppercase ${textSecondary}`}>
+                    最近接入记录
+                  </h3>
+                </div>
+                <div className="mt-4 space-y-3">
+                  {matchingIntegrations.length === 0 && !runtimeState.isLoading && (
+                    <div className={`rounded-[22px] p-4 text-sm ${textSecondary} ${mutedSurface}`}>
+                      当前还没有匹配到接入记录。
+                    </div>
+                  )}
+
+                  {runtimeState.isLoading && (
+                    <div className={`rounded-[22px] p-4 text-sm ${textSecondary} ${mutedSurface}`}>
+                      正在读取接入记录...
+                    </div>
+                  )}
+
+                  {matchingIntegrations.map((integration) => (
+                    <div
+                      key={integration.id}
+                      className={`rounded-[22px] border p-4 ${cardSurface}`}
+                    >
+                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          <div className={`font-semibold ${textPrimary}`}>{integration.name}</div>
+                          <div className={`mt-1 text-xs ${textSecondary}`}>
+                            {integration.base_url}
+                          </div>
+                        </div>
+                        <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
+                          {integration.status}
+                        </span>
                       </div>
                     </div>
                   ))}
