@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import { env, isSupabaseConfigured, resolveCorsOrigin } from './config.js';
+import { generateHaloArtifact, generateHaloChatReply } from './lib/ai.js';
 import { getSupabase } from './lib/supabase.js';
 import {
   createEnergyMetric,
@@ -44,6 +45,8 @@ app.get('/api', (_request, response) => {
       'GET /api/energy/analysis',
       'POST /api/energy/query-report',
       'POST /api/energy/metrics',
+      'POST /api/ai/chat',
+      'POST /api/ai/coding',
       'GET /api/reports',
       'POST /api/reports',
       'GET /api/integrations',
@@ -119,6 +122,40 @@ app.get('/api/energy/analysis', async (request, response, next) => {
 
     const analysis = await getEnergyAnalysis(projectCode);
     response.json(analysis);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/ai/chat', async (request, response, next) => {
+  try {
+    const { message } = request.body ?? {};
+
+    if (!message || typeof message !== 'string') {
+      response.status(400).json({ error: 'message is required to generate an AI reply.' });
+      return;
+    }
+
+    const result = await generateHaloChatReply(request.body);
+    response.json(result);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/ai/coding', async (request, response, next) => {
+  try {
+    const { artifactType, name, prompt } = request.body ?? {};
+
+    if (!artifactType || !name || !prompt) {
+      response.status(400).json({
+        error: 'artifactType, name and prompt are required to generate an AI artifact.',
+      });
+      return;
+    }
+
+    const result = await generateHaloArtifact(request.body);
+    response.json(result);
   } catch (error) {
     next(error);
   }

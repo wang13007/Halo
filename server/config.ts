@@ -16,6 +16,8 @@ const toNumber = (value: string | undefined, fallback: number) => {
 export const env = {
   apiPort: toNumber(process.env.API_PORT, 8787),
   corsOrigin: process.env.CORS_ORIGIN ?? '',
+  geminiModel: process.env.GEMINI_MODEL ?? '',
+  googleApiKey: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? '',
   longforAuthorization: process.env.LONGFOR_AUTHORIZATION ?? '',
   longforCastgc: process.env.LONGFOR_CASTGC ?? '',
   longforGaiaApiKey: process.env.LONGFOR_X_GAIA_API_KEY ?? '',

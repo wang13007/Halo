@@ -6,6 +6,7 @@ import {
   Menu,
   MessageSquare,
   Moon,
+  PencilLine,
   Settings,
   Sparkles,
   Sun,
@@ -16,16 +17,18 @@ import { ChatWorkspace } from './components/ChatWorkspace';
 import { ConfigCenter } from './components/ConfigCenter';
 import { DashboardHome } from './components/DashboardHome';
 import { SubscriptionPlans } from './components/SubscriptionPlans';
+import { createInitialAppCenterState } from './lib/apps';
+import { createInitialDashboardState } from './lib/dashboard';
 
 type PageId = 'apps' | 'chat' | 'config' | 'dashboard' | 'subscription';
 
 const pageMetaMap: Record<PageId, { description: string; title: string }> = {
   apps: {
-    description: '按收藏应用、我的应用和应用商场管理你的应用能力。',
-    title: '应用中心',
+    description: '管理收藏应用、我的应用和应用商店，并通过 AI Coding 快速创建应用。',
+    title: '应用',
   },
   chat: {
-    description: '默认空白起手，按 ChatGPT 式交互进行查询、分析和总结。',
+    description: '默认空白起手，通过快捷意图和 AI 模型联动完成能耗查询、对比、报表与诊断。',
     title: '智能对话',
   },
   config: {
@@ -33,7 +36,7 @@ const pageMetaMap: Record<PageId, { description: string; title: string }> = {
     title: '系统配置',
   },
   dashboard: {
-    description: '仅保留核心小组件，作为日常使用的轻量化运营看板。',
+    description: '在可切换的自定义看板中摆放小组件，按固定尺寸自动对齐布局。',
     title: '看板',
   },
   subscription: {
@@ -49,7 +52,7 @@ const navigationItems: Array<{
 }> = [
   { icon: LayoutDashboard, id: 'dashboard', label: '看板' },
   { icon: MessageSquare, id: 'chat', label: '对话' },
-  { icon: Grid2x2, id: 'apps', label: '应用中心' },
+  { icon: Grid2x2, id: 'apps', label: '应用' },
   { icon: Settings, id: 'config', label: '配置' },
 ];
 
@@ -58,6 +61,9 @@ const App = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [isDashboardEditorOpen, setIsDashboardEditorOpen] = useState(false);
+  const [dashboardState, setDashboardState] = useState(createInitialDashboardState);
+  const [appCenterState, setAppCenterState] = useState(createInitialAppCenterState);
 
   const userMenuRef = useRef<HTMLDivElement>(null);
 
@@ -83,7 +89,22 @@ const App = () => {
     : 'border-white/80 bg-white/84';
   const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
   const pageMeta = pageMetaMap[activeTab];
-  const showHeaderAction = activeTab === 'dashboard' || activeTab === 'chat';
+
+  const renderHeaderAction = () => {
+    if (activeTab === 'dashboard') {
+      return (
+        <button
+          onClick={() => setIsDashboardEditorOpen(true)}
+          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+        >
+          <PencilLine size={16} />
+          编辑看板
+        </button>
+      );
+    }
+
+    return null;
+  };
 
   return (
     <div className={`h-screen overflow-hidden ${pageBackground} transition-colors duration-300`}>
@@ -197,24 +218,28 @@ const App = () => {
                 </p>
               </div>
 
-              {showHeaderAction && (
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => setActiveTab('config')}
-                    className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-                  >
-                    <Settings size={16} />
-                    系统配置
-                  </button>
-                </div>
-              )}
+              <div className="flex gap-3">{renderHeaderAction()}</div>
             </div>
           </header>
 
           <div className="min-h-0 flex-1 overflow-hidden px-6 pb-6 lg:px-8">
-            {activeTab === 'dashboard' && <DashboardHome isDarkMode={isDarkMode} />}
+            {activeTab === 'dashboard' && (
+              <DashboardHome
+                dashboardState={dashboardState}
+                editorOpen={isDashboardEditorOpen}
+                isDarkMode={isDarkMode}
+                onChange={setDashboardState}
+                onCloseEditor={() => setIsDashboardEditorOpen(false)}
+              />
+            )}
             {activeTab === 'chat' && <ChatWorkspace isDarkMode={isDarkMode} />}
-            {activeTab === 'apps' && <AppsShowcase isDarkMode={isDarkMode} />}
+            {activeTab === 'apps' && (
+              <AppsShowcase
+                appCenterState={appCenterState}
+                isDarkMode={isDarkMode}
+                onChange={setAppCenterState}
+              />
+            )}
             {activeTab === 'config' && <ConfigCenter isDarkMode={isDarkMode} />}
             {activeTab === 'subscription' && <SubscriptionPlans isDarkMode={isDarkMode} />}
           </div>

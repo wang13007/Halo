@@ -9,6 +9,7 @@ import {
   startOfMonth,
   startOfWeek,
 } from 'date-fns';
+import { buildApiUrl } from './api';
 
 export type ChatQueryForm = {
   energyType: string;
@@ -85,7 +86,8 @@ export async function queryEnergyReport(
   payload: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<QueryReportProxyResponse> {
-  const response = await fetch('/api/energy/query-report', {
+  const targetUrl = buildApiUrl('/api/energy/query-report');
+  const response = await fetch(targetUrl, {
     body: JSON.stringify({ payload }),
     headers: {
       'Content-Type': 'application/json',
@@ -102,7 +104,7 @@ export async function queryEnergyReport(
       ok: response.ok,
       requestPayload: payload,
       upstreamStatus: response.status,
-      upstreamUrl: '/api/energy/query-report',
+      upstreamUrl: targetUrl,
     };
   }
 }

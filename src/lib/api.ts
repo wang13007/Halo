@@ -142,11 +142,57 @@ export type CreateIntegrationPayload = {
   username?: string;
 };
 
+export type AiChatPayload = {
+  action?: string;
+  context?: Record<string, unknown>;
+  dataPreview?: unknown;
+  message: string;
+  requestPayload?: Record<string, unknown> | null;
+  upstreamStatus?: number | null;
+};
+
+export type AiChatResponse = {
+  model: string;
+  reply: string;
+  thinking: string;
+  usedFallback: boolean;
+};
+
+export type GenerateArtifactPayload = {
+  artifactType: 'app' | 'widget';
+  goal?: string;
+  name: string;
+  prompt: string;
+  size?: string;
+};
+
+export type GenerateArtifactResponse = {
+  badge: string;
+  description: string;
+  items: string[];
+  model: string;
+  summary: string;
+  title: string;
+  usedFallback: boolean;
+};
+
 export const api = {
+  chatWithAi: (payload: AiChatPayload, signal?: AbortSignal) =>
+    request<AiChatResponse>('/api/ai/chat', {
+      body: JSON.stringify(payload),
+      method: 'POST',
+      signal,
+    }),
   createIntegration: (payload: CreateIntegrationPayload) =>
     request<{ integration: Integration }>('/api/integrations', {
       body: JSON.stringify(payload),
       method: 'POST',
+    }),
+  generateArtifact: (payload: GenerateArtifactPayload, signal?: AbortSignal) =>
+    request<GenerateArtifactResponse>('/api/ai/coding', {
+      body: JSON.stringify(payload),
+      method: 'POST',
+      signal,
     }),
   getEnergyAnalysis: (projectCode?: string) =>
     request<EnergyAnalysisResponse>(
