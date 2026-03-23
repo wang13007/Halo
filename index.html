@@ -59,7 +59,8 @@
       const boot = async () => {
         try {
           const response = await fetch('./@vite/client', { cache: 'no-store' });
-          if (response.ok) {
+          const contentType = response.headers.get('content-type') || '';
+          if (response.ok && /javascript|ecmascript/i.test(contentType)) {
             go('./app-shell.html', 'Development server detected. Opening app...');
             return;
           }
