@@ -1,0 +1,5 @@
+{
+  "name": "Halo Dashboard",
+  "description": "A smart dashboard application with energy monitoring, device status, and an AI chat interface.",
+  "requestFramePermissions": []
+}
