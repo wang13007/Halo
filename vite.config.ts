@@ -9,13 +9,6 @@ export default defineConfig(({mode}) => {
   return {
     base: './',
     plugins: [react(), tailwindcss()],
-    build: {
-      rollupOptions: {
-        input: {
-          index: path.resolve(__dirname, 'app-shell.html'),
-        },
-      },
-    },
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
     },
@@ -32,7 +25,7 @@ export default defineConfig(({mode}) => {
           changeOrigin: true,
         },
       },
-      open: '/app-shell.html',
+      open: '/',
       hmr: process.env.DISABLE_HMR !== 'true',
     },
   };
