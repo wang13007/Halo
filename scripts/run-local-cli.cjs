@@ -8,12 +8,13 @@ const cliArgs =
     ? process.argv.slice(2)
     : process.argv.slice(1);
 const [tool, ...args] = cliArgs;
+const resolveBin = (...segments) => path.join('node_modules', ...segments);
 
 const toolCommands = {
-  concurrently: ['node', ['node_modules\\concurrently\\dist\\bin\\concurrently.js']],
-  tsx: ['node', ['node_modules\\tsx\\dist\\cli.mjs']],
-  vite: ['node', ['node_modules\\vite\\bin\\vite.js']],
-  tsc: ['node', ['node_modules\\typescript\\bin\\tsc']],
+  concurrently: ['node', [resolveBin('concurrently', 'dist', 'bin', 'concurrently.js')]],
+  tsx: ['node', [resolveBin('tsx', 'dist', 'cli.mjs')]],
+  vite: ['node', [resolveBin('vite', 'bin', 'vite.js')]],
+  tsc: ['node', [resolveBin('typescript', 'bin', 'tsc')]],
 };
 
 if (!tool || !toolCommands[tool]) {

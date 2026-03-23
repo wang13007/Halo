@@ -4,15 +4,15 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" concurrently \"npm:dev:server\" \"npm:dev:client\"",
-    "dev:client": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" vite --port=3000 --host=0.0.0.0",
-    "dev:server": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" tsx watch server/index.ts",
-    "build": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" vite build",
-    "preview": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" vite preview --host=0.0.0.0",
-    "start": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" tsx server/index.ts",
-    "db:setup": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" tsx scripts/setup-supabase.ts",
-    "clean": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" clean",
-    "lint": "powershell -NoProfile -ExecutionPolicy Bypass -File \"%npm_package_json:package.json=scripts\\npm-runner.ps1%\" tsc --noEmit"
+    "dev": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" concurrently \"npm:dev:server\" \"npm:dev:client\"",
+    "dev:client": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" vite --port=3000 --host=0.0.0.0",
+    "dev:server": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" tsx watch server/index.ts",
+    "build": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" vite build",
+    "preview": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" vite preview --host=0.0.0.0",
+    "start": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" tsx server/index.ts",
+    "db:setup": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" tsx scripts/setup-supabase.ts",
+    "clean": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" clean",
+    "lint": "node -e \"const path=require('path');const {spawnSync}=require('child_process');const root=path.dirname(process.env.npm_package_json);const cli=path.join(root,'scripts','run-local-cli.cjs');const result=spawnSync(process.execPath,[cli,...process.argv.slice(1)],{stdio:'inherit',cwd:root});process.exit(result.status ?? 1)\" tsc --noEmit"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
