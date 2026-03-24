@@ -4,13 +4,17 @@ import { env, isSupabaseConfigured, resolveCorsOrigin } from './config.js';
 import { generateHaloArtifact, generateHaloChatReply } from './lib/ai.js';
 import { getSupabase } from './lib/supabase.js';
 import {
+  createChatSession,
   createEnergyMetric,
   createIntegration,
   createReport,
+  getChatSession,
   getEnergyAnalysis,
+  listChatSessions,
   listIntegrations,
   listProjects,
   listReports,
+  updateChatSession,
 } from './services/halo-service.js';
 
 const app = express();
@@ -203,6 +207,10 @@ app.get('/api', (_request, response) => {
     routes: [
       'GET /api/health',
       'GET /api/projects',
+      'GET /api/chat/sessions',
+      'GET /api/chat/sessions/:sessionId',
+      'POST /api/chat/sessions',
+      'PATCH /api/chat/sessions/:sessionId',
       'GET /api/energy/analysis',
       'GET /api/energy/quick-projects',
       'POST /api/energy/query-report',
@@ -270,6 +278,56 @@ app.get('/api/projects', async (_request, response, next) => {
   try {
     const projects = await listProjects();
     response.json({ projects });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/chat/sessions', async (_request, response, next) => {
+  try {
+    const sessions = await listChatSessions();
+    response.json({ sessions });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/chat/sessions/:sessionId', async (request, response, next) => {
+  try {
+    const session = await getChatSession(request.params.sessionId);
+    response.json({ session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/chat/sessions', async (request, response, next) => {
+  try {
+    const { messages } = request.body ?? {};
+
+    if (!Array.isArray(messages)) {
+      response.status(400).json({ error: 'messages must be an array to create a chat session.' });
+      return;
+    }
+
+    const session = await createChatSession(request.body);
+    response.status(201).json({ session });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.patch('/api/chat/sessions/:sessionId', async (request, response, next) => {
+  try {
+    const { messages } = request.body ?? {};
+
+    if (!Array.isArray(messages)) {
+      response.status(400).json({ error: 'messages must be an array to update a chat session.' });
+      return;
+    }
+
+    const session = await updateChatSession(request.params.sessionId, request.body);
+    response.json({ session });
   } catch (error) {
     next(error);
   }

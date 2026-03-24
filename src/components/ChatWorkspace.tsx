@@ -48,7 +48,7 @@ const quickIntents: Array<{
   label: string;
 }> = [
   {
-    description: '拉取当前筛选条件下的能耗数据并生成查询说明。',
+    description: '拉取当前筛选条件下的能耗数据，并生成查询说明。',
     id: 'energy-query',
     label: '能耗查询',
   },
@@ -63,7 +63,7 @@ const quickIntents: Array<{
     label: '能源报表',
   },
   {
-    description: '围绕异常波动、基线偏高和节能机会生成诊断意见。',
+    description: '围绕异常波动、基线偏高和节能机会生成诊断建议。',
     id: 'energy-diagnostic',
     label: '能源诊断报告',
   },
@@ -100,8 +100,25 @@ const historyItems: HistoryItem[] = [
 ];
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
 const intentTriggerPattern = /[查用点能耗报诊]/;
+
+const normalizeProjectLoadError = (error: unknown) => {
+  const fallbackMessage = '项目列表同步失败，已暂时使用默认项目。';
+
+  if (!(error instanceof Error)) {
+    return fallbackMessage;
+  }
+
+  if (
+    error.message.includes('HTML 页面') ||
+    error.message.includes('<!doctype') ||
+    error.message.includes('接口未返回 JSON')
+  ) {
+    return '当前站点未连接 Halo 后端接口，已暂时使用默认项目。';
+  }
+
+  return error.message || fallbackMessage;
+};
 
 export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const initialProjectOption = fallbackProjectOptions[0];
@@ -187,11 +204,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       } catch (error) {
         if (isMounted) {
           setHasLoadedProjects(true);
-          setProjectLoadError(
-            error instanceof Error
-              ? error.message
-              : '项目列表同步失败，已暂时使用默认项目。',
-          );
+          setProjectLoadError(normalizeProjectLoadError(error));
           setProjectOptions(fallbackProjectOptions);
         }
       } finally {
@@ -376,7 +389,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           <div className={`min-h-0 flex-1 overflow-y-auto rounded-[24px] ${mutedSurface} p-4`}>
             {chatMessages.length === 0 && !isThinking ? (
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center">
-                <h3 className={`text-2xl font-black tracking-tight ${textPrimary}`}>今天想聊什么？</h3>
+                <h3 className={`text-2xl font-black tracking-tight ${textPrimary}`}>今天想聊什么?</h3>
                 <p className={`mt-2 max-w-xl text-sm leading-6 ${textSecondary}`}>
                   输入问题后即可开始对话；当输入包含“查、用、点、能、耗、报、诊”等字符时，会自动出现能耗快捷意图。
                 </p>
@@ -487,6 +500,8 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
                     <option value="今天">今天</option>
                     <option value="本周">本周</option>
                     <option value="本月">本月</option>
+                    <option value="本季">本季</option>
+                    <option value="本年">本年</option>
                   </select>
                   <select
                     value={chatForm.interval}

@@ -10,6 +10,21 @@ const projectRoot = path.resolve(currentDir, '..');
 const readSqlFile = async (relativePath: string) =>
   fs.readFile(path.join(projectRoot, relativePath), 'utf8');
 
+const readMigrationSql = async () => {
+  const migrationsDir = path.join(projectRoot, 'supabase', 'migrations');
+  const migrationFiles = (await fs.readdir(migrationsDir))
+    .filter((fileName) => fileName.endsWith('.sql'))
+    .sort((left, right) => left.localeCompare(right));
+
+  const statements = await Promise.all(
+    migrationFiles.map((fileName) =>
+      fs.readFile(path.join(migrationsDir, fileName), 'utf8'),
+    ),
+  );
+
+  return statements.join('\n\n');
+};
+
 const run = async () => {
   if (!env.supabaseDbUrl) {
     throw new Error(
@@ -17,7 +32,7 @@ const run = async () => {
     );
   }
 
-  const schemaSql = await readSqlFile('supabase/migrations/20260323_init.sql');
+  const schemaSql = await readMigrationSql();
   const seedSql = await readSqlFile('supabase/seed.sql');
   const shouldUseSsl = !env.supabaseDbUrl.includes('localhost');
 

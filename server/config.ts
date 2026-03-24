@@ -1,9 +1,13 @@
+import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import dotenv from 'dotenv';
 
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(currentDir, '..');
+const projectRootCandidates = [path.resolve(currentDir, '..'), path.resolve(currentDir, '..', '..')];
+const projectRoot =
+  projectRootCandidates.find((candidate) => fs.existsSync(path.join(candidate, 'package.json'))) ??
+  path.resolve(currentDir, '..');
 
 dotenv.config({ path: path.join(projectRoot, '.env.local'), override: true });
 dotenv.config({ path: path.join(projectRoot, '.env'), override: false });
@@ -14,7 +18,7 @@ const toNumber = (value: string | undefined, fallback: number) => {
 };
 
 export const env = {
-  apiPort: toNumber(process.env.API_PORT, 8787),
+  apiPort: toNumber(process.env.PORT ?? process.env.API_PORT, 8787),
   corsOrigin: process.env.CORS_ORIGIN ?? '',
   geminiModel: process.env.GEMINI_MODEL ?? '',
   googleApiKey: process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY ?? '',

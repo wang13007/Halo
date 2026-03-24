@@ -2,14 +2,18 @@ import {
   endOfDay,
   endOfHour,
   endOfMonth,
+  endOfQuarter,
   endOfWeek,
+  endOfYear,
   format,
   startOfDay,
   startOfHour,
   startOfMonth,
+  startOfQuarter,
   startOfWeek,
+  startOfYear,
 } from 'date-fns';
-import { buildApiUrl } from './api';
+import { buildApiUrl, readApiBody } from './api';
 
 export type ChatQueryForm = {
   energyType: string;
@@ -38,8 +42,8 @@ const energyTypeCodeMap: Record<string, string> = {
 };
 
 const queryTypeCodeMap: Record<string, number> = {
-  '1天': 2,
   '1小时': 1,
+  '1天': 2,
 };
 
 function resolveTimeRange(timeRange: string, now = new Date()) {
@@ -57,6 +61,20 @@ function resolveTimeRange(timeRange: string, now = new Date()) {
     };
   }
 
+  if (timeRange === '本季') {
+    return {
+      end: endOfQuarter(now),
+      start: startOfQuarter(now),
+    };
+  }
+
+  if (timeRange === '本年') {
+    return {
+      end: endOfYear(now),
+      start: startOfYear(now),
+    };
+  }
+
   return {
     end: endOfDay(now),
     start: startOfDay(now),
@@ -68,11 +86,11 @@ export function buildEnergyQueryPayload(form: ChatQueryForm) {
   const startAt = form.interval === '1小时' ? startOfHour(start).getTime() : start.getTime();
   const endAt = form.interval === '1小时' ? endOfHour(end).getTime() : end.getTime();
   const queryType = queryTypeCodeMap[form.interval] ?? 1;
-  const energyTypeCode = energyTypeCodeMap[form.energyType] ?? form.energyType;
+  const meterType = energyTypeCodeMap[form.energyType] ?? form.energyType;
 
   return {
     endTime: endAt,
-    meterType: energyTypeCode,
+    meterType,
     orgId: form.orgId,
     pageNum: form.pageNum,
     pageSize: form.pageSize,
@@ -97,11 +115,30 @@ export async function queryEnergyReport(
   });
 
   try {
-    return (await response.json()) as QueryReportProxyResponse;
-  } catch {
+    const data = await readApiBody<QueryReportProxyResponse | string>(response);
+
+    if (data && typeof data === 'object' && 'ok' in data && 'upstreamStatus' in data) {
+      return data as QueryReportProxyResponse;
+    }
+
     return {
-      message: '代理接口没有返回可解析的 JSON 数据。',
+      data,
+      message:
+        typeof data === 'string'
+          ? data
+          : '代理接口返回的数据结构异常，请检查后端 query-report 代理。',
       ok: response.ok,
+      requestPayload: payload,
+      upstreamStatus: response.status,
+      upstreamUrl: targetUrl,
+    };
+  } catch (error) {
+    return {
+      message:
+        error instanceof Error
+          ? error.message
+          : '代理接口没有返回可解析的 JSON 数据。',
+      ok: false,
       requestPayload: payload,
       upstreamStatus: response.status,
       upstreamUrl: targetUrl,

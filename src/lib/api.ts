@@ -33,6 +33,15 @@ const resolveApiBaseUrl = () => {
 
 const API_BASE_URL = resolveApiBaseUrl();
 
+const apiHtmlFallbackMessage =
+  '当前站点返回了 HTML 页面而不是接口 JSON，说明 /api 后端未接通。请启动本地服务端，或为部署环境配置 VITE_API_BASE_URL。';
+
+const looksLikeHtmlDocument = (value: string) =>
+  /^\s*<!doctype html/i.test(value) || /^\s*<html/i.test(value);
+
+const isJsonContentType = (contentType: string) =>
+  contentType.includes('application/json') || contentType.includes('+json');
+
 export const buildApiUrl = (path: string) => {
   if (typeof window !== 'undefined') {
     const isFileProtocol = window.location.protocol === 'file:';
@@ -46,6 +55,33 @@ export const buildApiUrl = (path: string) => {
   return API_BASE_URL ? `${API_BASE_URL}${path}` : path;
 };
 
+export const readApiBody = async <T>(response: Response) => {
+  const rawText = await response.text();
+  const contentType = response.headers.get('content-type') ?? '';
+
+  if (!rawText) {
+    return null as T | null;
+  }
+
+  if (looksLikeHtmlDocument(rawText)) {
+    throw new Error(apiHtmlFallbackMessage);
+  }
+
+  if (isJsonContentType(contentType)) {
+    try {
+      return JSON.parse(rawText) as T;
+    } catch {
+      throw new Error('接口返回的 JSON 格式无效，请检查后端返回内容。');
+    }
+  }
+
+  try {
+    return JSON.parse(rawText) as T;
+  } catch {
+    return rawText as T;
+  }
+};
+
 const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
   const response = await fetch(buildApiUrl(path), {
     headers: {
@@ -55,14 +91,35 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
     ...init,
   });
 
+  const payload = (await readApiBody<unknown>(response).catch((error) => {
+    if (error instanceof Error) {
+      throw error;
+    }
+
+    throw new Error('接口返回内容无法解析。');
+  })) as { error?: string } | string | null;
+
   if (!response.ok) {
-    const payload = (await response.json().catch(() => null)) as
-      | { error?: string }
-      | null;
-    throw new Error(payload?.error ?? `Request failed: ${response.status}`);
+    if (payload && typeof payload === 'object' && 'error' in payload && payload.error) {
+      throw new Error(String(payload.error));
+    }
+
+    if (typeof payload === 'string' && payload.trim()) {
+      throw new Error(payload);
+    }
+
+    throw new Error(`Request failed: ${response.status}`);
   }
 
-  return response.json() as Promise<T>;
+  if (payload === null) {
+    throw new Error('接口返回了空响应。');
+  }
+
+  if (typeof payload === 'string') {
+    throw new Error('接口未返回 JSON 数据，请检查后端接口。');
+  }
+
+  return payload as T;
 };
 
 export type HealthResponse = {

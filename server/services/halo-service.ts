@@ -1,11 +1,12 @@
+import { randomUUID } from 'node:crypto';
 import { format } from 'date-fns';
 import { getSupabase } from '../lib/supabase.js';
 
 type ProjectRow = {
-  id: string;
   code: string;
-  name: string;
+  id: string;
   location: string | null;
+  name: string;
   timezone: string | null;
 };
 
@@ -49,6 +50,48 @@ type ReportInput = {
   title: string;
 };
 
+export type ChatSessionMessage = {
+  content: string;
+  createdAt?: string;
+  id: string;
+  role: 'assistant' | 'user';
+  thinking?: string;
+};
+
+type ChatSessionRow = {
+  created_at: string;
+  id: string;
+  last_message_at: string;
+  metadata: Record<string, unknown> | null;
+  messages?: ChatSessionMessage[] | null;
+  status: string;
+  summary: string;
+  title: string;
+  updated_at: string;
+};
+
+export type ChatSession = {
+  created_at: string;
+  id: string;
+  last_message_at: string;
+  metadata: Record<string, unknown>;
+  messages: ChatSessionMessage[];
+  status: string;
+  summary: string;
+  title: string;
+  updated_at: string;
+};
+
+export type ChatSessionSummary = Omit<ChatSession, 'messages'>;
+
+type ChatSessionInput = {
+  messages: ChatSessionMessage[];
+  metadata?: Record<string, unknown>;
+  status?: string;
+  summary?: string;
+  title?: string;
+};
+
 const sumBy = <T>(items: T[], selector: (item: T) => number | null | undefined) =>
   items.reduce((total, item) => total + (selector(item) ?? 0), 0);
 
@@ -83,6 +126,146 @@ const endOfPreviousMonth = (date = new Date()) => {
   const local = startOfCurrentMonth(date);
   local.setMilliseconds(-1);
   return local;
+};
+
+const isPlainObject = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+
+const truncateText = (value: string, maxLength: number) => {
+  const trimmed = value.trim();
+  if (trimmed.length <= maxLength) {
+    return trimmed;
+  }
+
+  return `${trimmed.slice(0, maxLength).trimEnd()}...`;
+};
+
+const toValidIsoString = (value: unknown) => {
+  if (typeof value !== 'string' || !value.trim()) {
+    return '';
+  }
+
+  const timestamp = Date.parse(value);
+  return Number.isNaN(timestamp) ? '' : new Date(timestamp).toISOString();
+};
+
+const normalizeChatMessages = (messages: unknown): ChatSessionMessage[] => {
+  if (!Array.isArray(messages)) {
+    return [];
+  }
+
+  return messages.flatMap((message) => {
+    if (!isPlainObject(message)) {
+      return [];
+    }
+
+    const role = message.role;
+    const content = typeof message.content === 'string' ? message.content.trim() : '';
+    const id = typeof message.id === 'string' && message.id.trim() ? message.id.trim() : randomUUID();
+    const thinking =
+      typeof message.thinking === 'string' && message.thinking.trim()
+        ? message.thinking.trim()
+        : undefined;
+    const createdAt = toValidIsoString(message.createdAt) || new Date().toISOString();
+
+    if ((role !== 'assistant' && role !== 'user') || !content) {
+      return [];
+    }
+
+    return [
+      {
+        content,
+        createdAt,
+        id,
+        role,
+        ...(thinking ? { thinking } : {}),
+      },
+    ];
+  });
+};
+
+const normalizeMetadata = (value: unknown) => (isPlainObject(value) ? value : {});
+
+const deriveSessionTitle = (messages: ChatSessionMessage[], title?: string) => {
+  if (typeof title === 'string' && title.trim()) {
+    return truncateText(title, 48);
+  }
+
+  const firstUserMessage = messages.find((message) => message.role === 'user');
+  if (firstUserMessage) {
+    return truncateText(firstUserMessage.content, 48);
+  }
+
+  return '新建会话';
+};
+
+const deriveSessionSummary = (messages: ChatSessionMessage[], summary?: string) => {
+  if (typeof summary === 'string' && summary.trim()) {
+    return truncateText(summary, 96);
+  }
+
+  const lastAssistantMessage = [...messages]
+    .reverse()
+    .find((message) => message.role === 'assistant');
+  if (lastAssistantMessage) {
+    return truncateText(lastAssistantMessage.content, 96);
+  }
+
+  const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
+  if (lastUserMessage) {
+    return truncateText(lastUserMessage.content, 96);
+  }
+
+  return '';
+};
+
+const resolveLastMessageAt = (messages: ChatSessionMessage[]) => {
+  const lastTimestamp = [...messages]
+    .reverse()
+    .map((message) => toValidIsoString(message.createdAt))
+    .find(Boolean);
+
+  return lastTimestamp || new Date().toISOString();
+};
+
+const normalizeChatSession = (row: ChatSessionRow): ChatSession => ({
+  created_at: row.created_at,
+  id: row.id,
+  last_message_at: row.last_message_at,
+  metadata: normalizeMetadata(row.metadata),
+  messages: normalizeChatMessages(row.messages ?? []),
+  status: row.status,
+  summary: row.summary,
+  title: row.title,
+  updated_at: row.updated_at,
+});
+
+const toChatSessionSummary = (session: ChatSession): ChatSessionSummary => ({
+  created_at: session.created_at,
+  id: session.id,
+  last_message_at: session.last_message_at,
+  metadata: session.metadata,
+  status: session.status,
+  summary: session.summary,
+  title: session.title,
+  updated_at: session.updated_at,
+});
+
+const buildChatSessionPayload = (input: ChatSessionInput) => {
+  const messages = normalizeChatMessages(input.messages);
+  const metadata = normalizeMetadata(input.metadata);
+
+  return {
+    last_message_at: resolveLastMessageAt(messages),
+    messages,
+    metadata,
+    status:
+      typeof input.status === 'string' && input.status.trim()
+        ? input.status.trim()
+        : 'active',
+    summary: deriveSessionSummary(messages, input.summary),
+    title: deriveSessionTitle(messages, input.title),
+  };
 };
 
 export const listProjects = async () => {
@@ -368,4 +551,84 @@ export const createReport = async (input: ReportInput) => {
   }
 
   return data;
+};
+
+export const listChatSessions = async () => {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .select('id, title, summary, status, metadata, last_message_at, created_at, updated_at')
+    .order('last_message_at', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as ChatSessionRow[]).map((row) =>
+    toChatSessionSummary(normalizeChatSession(row)),
+  );
+};
+
+export const getChatSession = async (sessionId: string) => {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .select(
+      'id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at',
+    )
+    .eq('id', sessionId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error('Chat session not found.');
+  }
+
+  return normalizeChatSession(data as ChatSessionRow);
+};
+
+export const createChatSession = async (input: ChatSessionInput) => {
+  const supabase = getSupabase();
+  const payload = buildChatSessionPayload(input);
+
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .insert(payload)
+    .select(
+      'id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at',
+    )
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return normalizeChatSession(data as ChatSessionRow);
+};
+
+export const updateChatSession = async (sessionId: string, input: ChatSessionInput) => {
+  const supabase = getSupabase();
+  const payload = buildChatSessionPayload(input);
+
+  const { data, error } = await supabase
+    .from('chat_sessions')
+    .update(payload)
+    .eq('id', sessionId)
+    .select(
+      'id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at',
+    )
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  if (!data) {
+    throw new Error('Chat session not found.');
+  }
+
+  return normalizeChatSession(data as ChatSessionRow);
 };
