@@ -28,15 +28,15 @@ const pageMetaMap: Record<PageId, { description: string; title: string }> = {
     title: '应用',
   },
   chat: {
-    description: '默认空白起手，通过快捷意图和 AI 模型联动完成能耗查询、对比、报表与诊断。',
+    description: '从空白输入开始，结合快捷意图与 AI 模型完成能耗查询、对比、报表和诊断。',
     title: '智能对话',
   },
   config: {
-    description: '从系统卡片进入详情窗口，集中查看接入状态、接口和数据准备情况。',
+    description: '集中查看系统接入状态、接口配置和数据准备情况，快速定位链路问题。',
     title: '系统配置',
   },
   dashboard: {
-    description: '在可切换的自定义看板中摆放小组件，按固定尺寸自动对齐布局。',
+    description: '在可切换的自定义看板中组织小组件，按固定栅格自动对齐布局。',
     title: '看板',
   },
   subscription: {
@@ -91,19 +91,19 @@ const App = () => {
   const pageMeta = pageMetaMap[activeTab];
 
   const renderHeaderAction = () => {
-    if (activeTab === 'dashboard') {
-      return (
-        <button
-          onClick={() => setIsDashboardEditorOpen(true)}
-          className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
-        >
-          <PencilLine size={16} />
-          编辑看板
-        </button>
-      );
+    if (activeTab !== 'dashboard') {
+      return null;
     }
 
-    return null;
+    return (
+      <button
+        onClick={() => setIsDashboardEditorOpen(true)}
+        className="inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-slate-900/10 transition hover:bg-slate-700"
+      >
+        <PencilLine size={16} />
+        编辑看板
+      </button>
+    );
   };
 
   return (
@@ -122,7 +122,7 @@ const App = () => {
         >
           <div className="flex items-center justify-between gap-3 px-2">
             <div className="flex items-center gap-3 overflow-hidden">
-              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/10 dark:bg-white dark:text-slate-900">
+              <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/10">
                 <Sparkles size={18} />
               </div>
               {isSidebarExpanded && (
@@ -132,6 +132,7 @@ const App = () => {
                 </div>
               )}
             </div>
+
             <button
               onClick={() => setIsSidebarExpanded((previous) => !previous)}
               className={`rounded-2xl p-2 ${mutedSurface} ${textPrimary}`}
