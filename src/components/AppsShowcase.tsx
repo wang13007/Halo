@@ -82,7 +82,7 @@ export const AppsShowcase = ({
 
   const visibleApps = useMemo(() => {
     if (appCenterState.activeTab === 'favorites') {
-      return appCenterState.apps.filter((app) => app.installed && app.favorite);
+      return appCenterState.apps.filter((app) => app.favorite);
     }
 
     if (appCenterState.activeTab === 'mine') {
@@ -117,7 +117,7 @@ export const AppsShowcase = ({
   };
 
   const handleToggleFavorite = (appId: string) => {
-    updateApp(appId, (app) => ({ ...app, favorite: !app.favorite, installed: true }));
+    updateApp(appId, (app) => ({ ...app, favorite: !app.favorite }));
   };
 
   const handleInstall = (appId: string) => {
@@ -264,33 +264,28 @@ export const AppsShowcase = ({
           >
             {app.installed ? '已安装' : '安装'}
           </button>
-          {app.installed && (
-            <button
-              onClick={() => handleToggleFavorite(app.id)}
-              className={`inline-flex items-center justify-center gap-2 rounded-[16px] border px-3 py-2.5 text-xs font-bold ${tileSurface} ${textPrimary}`}
-            >
-              {app.favorite ? '已收藏' : '加入收藏'}
-            </button>
-          )}
         </div>
       );
     }
 
     return (
       <div className="mt-4 flex gap-2">
-        <button
-          onClick={() => handleRun(app)}
-          className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
-        >
-          <Play size={14} />
-          运行
-        </button>
-        <button
-          onClick={() => handleToggleFavorite(app.id)}
-          className={`inline-flex items-center justify-center gap-2 rounded-[16px] border px-3 py-2.5 text-xs font-bold ${tileSurface} ${textPrimary}`}
-        >
-          {app.favorite ? '取消收藏' : '加入收藏'}
-        </button>
+        {app.installed ? (
+          <button
+            onClick={() => handleRun(app)}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+          >
+            <Play size={14} />
+            运行
+          </button>
+        ) : (
+          <button
+            onClick={() => handleInstall(app.id)}
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+          >
+            安装
+          </button>
+        )}
       </div>
     );
   };
@@ -355,23 +350,17 @@ export const AppsShowcase = ({
                   </div>
 
                   <div className="flex items-center gap-2">
-                    <span className="rounded-full bg-blue-500/10 px-2.5 py-1 text-[11px] font-bold text-blue-600">
-                      {app.badge}
-                    </span>
-
-                    {app.installed && (
-                      <button
-                        onClick={() => handleToggleFavorite(app.id)}
-                        className={`rounded-full p-1.5 ${
-                          app.favorite
-                            ? 'bg-rose-500/10 text-rose-500'
-                            : `${mutedSurface} ${textPrimary}`
-                        }`}
-                        title={app.favorite ? '取消收藏' : '加入收藏'}
-                      >
-                        <Heart size={14} className={app.favorite ? 'fill-current' : ''} />
-                      </button>
-                    )}
+                    <button
+                      onClick={() => handleToggleFavorite(app.id)}
+                      className={`rounded-full p-1.5 ${
+                        app.favorite
+                          ? 'bg-rose-500/10 text-rose-500'
+                          : `${mutedSurface} ${textPrimary}`
+                      }`}
+                      title={app.favorite ? '取消收藏' : '加入收藏'}
+                    >
+                      <Heart size={14} className={app.favorite ? 'fill-current' : ''} />
+                    </button>
                   </div>
                 </div>
 
@@ -421,7 +410,7 @@ export const AppsShowcase = ({
             <div
               className={`col-span-full flex min-h-[220px] items-center justify-center rounded-[24px] border border-dashed px-6 text-sm ${textSecondary}`}
             >
-              当前标签还没有应用，试试创建应用或把已安装应用加入收藏。
+              当前标签还没有应用，试试创建应用或点击卡片右上角的收藏图标。
             </div>
           )}
         </div>
