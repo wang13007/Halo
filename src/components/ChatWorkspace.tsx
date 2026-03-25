@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
 import {
   ChevronDown,
   ChevronLeft,
@@ -8,7 +9,7 @@ import {
   Sparkles,
   Square,
 } from 'lucide-react';
-import { api, type EnergyQuickProject } from '../lib/api';
+import { api, type EnergyQuickProject, type Project } from '../lib/api';
 import { buildEnergyQueryPayload, queryEnergyReport, type ChatQueryForm } from '../lib/energyQuery';
 
 type QuickIntentId =
@@ -34,13 +35,7 @@ type HistoryItem = {
   userPrompt: string;
 };
 
-const fallbackProjectOptions: EnergyQuickProject[] = [
-  {
-    channel: 'C2',
-    name: '',
-    orgId: 'L-SH00-SHZXM00.04',
-  },
-];
+const emptyProjectOptions: EnergyQuickProject[] = [];
 
 const quickIntents: Array<{
   description: string;
@@ -100,7 +95,36 @@ const createHistoryItems = (projectName: string): HistoryItem[] => [
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-const normalizeProjectLoadError = (error: unknown) => {
+const normalizeQuickProjects = (projects: Array<Partial<EnergyQuickProject>>) => {
+  const dedupedProjects = new Map<string, EnergyQuickProject>();
+
+  projects.forEach((project) => {
+    const name = typeof project.name === 'string' ? project.name.trim() : '';
+    const orgId = typeof project.orgId === 'string' ? project.orgId.trim() : '';
+    const channel = typeof project.channel === 'string' ? project.channel.trim() : 'LONGFOR';
+
+    if (!name || !orgId) {
+      return;
+    }
+
+    dedupedProjects.set(`${orgId}::${name}`, { channel: channel || 'LONGFOR', name, orgId });
+  });
+
+  return [...dedupedProjects.values()].sort((left, right) =>
+    left.name.localeCompare(right.name, 'zh-CN'),
+  );
+};
+
+const mapProjectsToQuickOptions = (projects: Project[]) =>
+  normalizeQuickProjects(
+    projects.map((project) => ({
+      channel: 'LOCAL',
+      name: project.name,
+      orgId: project.code || project.id,
+    })),
+  );
+
+const normalizeProjectLoadError = (error: unknown, hasFallbackProjects = false) => {
   const fallbackMessage = '项目列表同步失败，已暂时使用默认项目。';
 
   if (!(error instanceof Error)) {
@@ -118,15 +142,50 @@ const normalizeProjectLoadError = (error: unknown) => {
   return error.message || fallbackMessage;
 };
 
+const getProjectLoadErrorMessage = (error: unknown, hasFallbackProjects = false) => {
+  const fallbackMessage = '项目列表同步失败。';
+
+  if (!(error instanceof Error)) {
+    return hasFallbackProjects ? `${fallbackMessage} 已回退到本地项目列表。` : fallbackMessage;
+  }
+
+  const message = error.message || '';
+
+  if (message.includes('<!doctype') || message.includes('<html') || message.includes('HTML') || message.includes('JSON')) {
+    return hasFallbackProjects
+      ? '当前站点未连接 Halo 后端接口，已回退到本地项目列表。'
+      : '当前站点未连接 Halo 后端接口。';
+  }
+
+  if (
+    message.includes('TLS handshake failed') ||
+    message.includes('ECONNRESET') ||
+    message.includes('fetch failed')
+  ) {
+    return hasFallbackProjects
+      ? '龙湖项目接口握手失败，当前环境可能未接入内网或 VPN，已回退到本地项目列表。'
+      : '龙湖项目接口握手失败，当前环境可能未接入内网或 VPN。';
+  }
+
+  const nextMessage = message || fallbackMessage;
+  return hasFallbackProjects ? `${nextMessage} 已回退到本地项目列表。` : nextMessage;
+};
+
+const layoutSpringTransition = {
+  damping: 28,
+  mass: 0.9,
+  stiffness: 280,
+  type: 'spring' as const,
+};
+
 export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
-  const initialProjectOption = fallbackProjectOptions[0];
   const [chatForm, setChatForm] = useState<ChatQueryForm>({
     energyType: '电',
     interval: '1小时',
-    orgId: initialProjectOption.orgId,
+    orgId: '',
     pageNum: 1,
     pageSize: 20,
-    project: initialProjectOption.name,
+    project: '',
     queryName: '',
     timeRange: '今天',
   });
@@ -135,7 +194,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(true);
   const [isThinking, setIsThinking] = useState(false);
   const [hasLoadedProjects, setHasLoadedProjects] = useState(false);
-  const [projectOptions, setProjectOptions] = useState<EnergyQuickProject[]>(fallbackProjectOptions);
+  const [projectOptions, setProjectOptions] = useState<EnergyQuickProject[]>(emptyProjectOptions);
   const [projectLoadError, setProjectLoadError] = useState('');
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState<QuickIntentId | null>(null);
@@ -156,6 +215,30 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     [],
   );
 
+  const syncProjectSelection = (projects: EnergyQuickProject[]) => {
+    setProjectOptions(projects);
+    setChatForm((previous) => {
+      if (projects.length === 0) {
+        return {
+          ...previous,
+          orgId: '',
+          project: '',
+        };
+      }
+
+      const matchedProject =
+        projects.find(
+          (project) => project.orgId === previous.orgId || project.name === previous.project,
+        ) ?? projects[0];
+
+      return {
+        ...previous,
+        orgId: matchedProject.orgId,
+        project: matchedProject.name,
+      };
+    });
+  };
+
   useEffect(() => {
     if (hasLoadedProjects) {
       return;
@@ -174,37 +257,30 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           return;
         }
 
-        const nextProjects = response.projects.filter(
-          (project) => Boolean(project?.name?.trim()) && Boolean(project?.orgId?.trim()),
-        );
+        const nextProjects = normalizeQuickProjects(response.projects);
 
-        if (nextProjects.length === 0) {
+        if (nextProjects.length > 0) {
           setHasLoadedProjects(true);
-          setProjectLoadError('项目接口未返回 C2 项目，已暂时使用默认项目。');
-          setProjectOptions(fallbackProjectOptions);
+          syncProjectSelection(nextProjects);
+          setProjectLoadError('');
           return;
         }
 
-        setProjectLoadError('');
-        setProjectOptions(nextProjects);
-        setHasLoadedProjects(true);
-        setChatForm((previous) => {
-          const matchedProject =
-            nextProjects.find(
-              (project) => project.orgId === previous.orgId || project.name === previous.project,
-            ) ?? nextProjects[0];
-
-          return {
-            ...previous,
-            orgId: matchedProject.orgId,
-            project: matchedProject.name,
-          };
-        });
+        throw new Error('项目接口已响应，但未返回可用项目。');
       } catch (error) {
         if (isMounted) {
+          let fallbackProjects: EnergyQuickProject[] = [];
+
+          try {
+            const localProjectsResponse = await api.getProjects();
+            fallbackProjects = mapProjectsToQuickOptions(localProjectsResponse.projects);
+          } catch {
+            fallbackProjects = [];
+          }
+
           setHasLoadedProjects(true);
-          setProjectLoadError(normalizeProjectLoadError(error));
-          setProjectOptions(fallbackProjectOptions);
+          setProjectLoadError(getProjectLoadErrorMessage(error, fallbackProjects.length > 0));
+          syncProjectSelection(fallbackProjects);
         }
       } finally {
         if (isMounted) {
@@ -296,6 +372,10 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       let upstreamStatus: number | null = null;
 
       if (activeIntent) {
+        if (!chatForm.orgId.trim()) {
+          throw new Error('项目列表暂不可用，请先检查项目接口后再使用快捷意图。');
+        }
+
         requestPayload = buildEnergyQueryPayload(chatForm);
         const reportResponse = await queryEnergyReport(requestPayload, requestController.signal);
         dataPreview = reportResponse.data ?? null;
@@ -371,8 +451,17 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   };
 
   return (
-    <div className="grid h-full min-h-0 gap-4 xl:grid-cols-[minmax(0,1fr)_300px]">
-      <section className={`flex min-h-0 flex-col overflow-hidden rounded-[28px] border shadow-sm ${cardSurface}`}>
+    <motion.div
+      layout
+      transition={layoutSpringTransition}
+      className="flex h-full min-h-0 flex-col gap-4 xl:flex-row"
+    >
+      <motion.section
+        layout
+        animate={{ scale: isHistoryExpanded ? 1 : 1.008 }}
+        transition={layoutSpringTransition}
+        className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border shadow-sm ${cardSurface}`}
+      >
         <div className="flex shrink-0 items-center justify-between px-5 py-5">
           <div>
             <h2 className={`text-xl font-black tracking-tight ${textPrimary}`}>对话工作台</h2>
@@ -380,7 +469,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           {!isHistoryExpanded && (
             <button
               onClick={() => setIsHistoryExpanded(true)}
-              className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
+              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-4 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
             >
               <ChevronLeft size={16} />
               展开历史
@@ -473,14 +562,18 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
                   <select
                     value={chatForm.orgId}
                     onChange={(event) => handleProjectChange(event.target.value)}
-                    disabled={projectsLoading && projectOptions.length === 0}
+                    disabled={projectsLoading || projectOptions.length === 0}
                     className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
                   >
-                    {projectOptions.map((project) => (
-                      <option key={project.orgId} value={project.orgId}>
-                        {project.name}
-                      </option>
-                    ))}
+                    {projectOptions.length === 0 ? (
+                      <option value="">{projectsLoading ? '项目加载中...' : '暂无可用项目'}</option>
+                    ) : (
+                      projectOptions.map((project) => (
+                        <option key={project.orgId} value={project.orgId}>
+                          {project.name}
+                        </option>
+                      ))
+                    )}
                   </select>
                   <select
                     value={chatForm.energyType}
@@ -580,10 +673,19 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      {isHistoryExpanded && (
-        <aside className={`flex min-h-0 flex-col overflow-hidden rounded-[28px] border p-5 shadow-sm ${cardSurface}`}>
+      <AnimatePresence initial={false}>
+        {isHistoryExpanded && (
+          <motion.aside
+            layout
+            initial={{ opacity: 0, scale: 0.96, x: 24 }}
+            animate={{ opacity: 1, scale: 1, x: 0 }}
+            exit={{ opacity: 0, scale: 0.96, x: 24 }}
+            transition={layoutSpringTransition}
+            className="min-h-0 xl:w-[300px] xl:flex-none"
+          >
+            <div className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border p-5 shadow-sm ${cardSurface}`}>
           <div className="flex shrink-0 items-center justify-between">
             <div>
               <h3 className={`text-lg font-black ${textPrimary}`}>历史对话</h3>
@@ -595,7 +697,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               </div>
               <button
                 onClick={() => setIsHistoryExpanded(false)}
-                className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
+                className={`inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-3.5 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
               >
                 <ChevronRight size={16} />
                 收起历史
@@ -616,8 +718,10 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               </button>
             ))}
           </div>
-        </aside>
-      )}
-    </div>
+            </div>
+          </motion.aside>
+        )}
+      </AnimatePresence>
+    </motion.div>
   );
 };

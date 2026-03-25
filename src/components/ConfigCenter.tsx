@@ -207,16 +207,18 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
       {selectedSystem && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
           <div
-            className={`max-h-[88vh] w-full max-w-4xl overflow-hidden rounded-[36px] border shadow-2xl ${cardSurface}`}
+            className={`max-h-[88vh] w-full max-w-5xl overflow-hidden rounded-[36px] border shadow-2xl ${cardSurface}`}
           >
-            <div className="flex items-center justify-between px-6 py-5">
-              <div className="flex items-center gap-3">
+            <div className="flex items-start justify-between gap-4 px-6 py-5">
+              <div className="flex items-start gap-3">
                 <div className={`rounded-2xl p-3 ${mutedSurface}`}>
                   <selectedSystem.icon size={20} className="text-blue-600" />
                 </div>
-                <div>
+                <div className="min-w-0">
                   <h2 className={`text-xl font-black ${textPrimary}`}>{selectedSystem.name}</h2>
-                  <p className={`mt-1 text-sm ${textSecondary}`}>{selectedSystem.detail}</p>
+                  <p className={`mt-1 max-w-2xl text-sm leading-6 ${textSecondary}`}>
+                    {selectedSystem.detail}
+                  </p>
                 </div>
               </div>
               <button
@@ -227,8 +229,8 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
               </button>
             </div>
 
-            <div className="max-h-[calc(88vh-88px)] overflow-y-auto px-6 pb-6">
-              <div className="grid gap-5 lg:grid-cols-[minmax(0,1.1fr)_minmax(280px,0.9fr)]">
+            <div className="max-h-[calc(88vh-92px)] overflow-y-auto px-6 pb-6">
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
                 <section className={`rounded-[28px] border p-5 ${cardSurface}`}>
                   <h3 className={`text-sm font-black tracking-[0.22em] uppercase ${textSecondary}`}>
                     后端接入状态
@@ -261,7 +263,7 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                     />
                   </div>
 
-                  <div className="mt-5 rounded-[24px] bg-blue-500/5 p-4 text-sm leading-7 text-slate-500">
+                  <div className="mt-5 rounded-[24px] border border-blue-500/10 bg-blue-500/5 p-4 text-sm leading-7 text-slate-500">
                     {runtimeState.error
                       ? `当前读取存在异常：${runtimeState.error}`
                       : '状态数据已集中到详情窗口中展示，主页面仅保留系统入口卡片。'}
@@ -272,7 +274,7 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                   <h3 className={`text-sm font-black tracking-[0.22em] uppercase ${textSecondary}`}>
                     系统信息
                   </h3>
-                  <div className="mt-4 space-y-3 text-sm">
+                  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
                     <DetailRow label="系统名称" value={selectedSystem.name} />
                     <DetailRow label="访问地址" value={selectedSystem.url} />
                     <DetailRow
@@ -304,9 +306,9 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                   {selectedSystem.apiList.map((apiItem) => (
                     <div
                       key={apiItem.path}
-                      className={`flex flex-col gap-2 rounded-[22px] border p-4 md:flex-row md:items-center md:justify-between ${cardSurface}`}
+                      className={`grid gap-3 rounded-[22px] border p-4 md:grid-cols-[auto_minmax(0,1fr)] ${cardSurface}`}
                     >
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-start gap-3">
                         <span
                           className={`rounded-full px-3 py-1 text-xs font-bold ${
                             apiItem.method === 'GET'
@@ -316,9 +318,9 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                         >
                           {apiItem.method}
                         </span>
-                        <div>
-                          <div className={`font-semibold ${textPrimary}`}>{apiItem.path}</div>
-                          <div className={`text-xs ${textSecondary}`}>{apiItem.desc}</div>
+                        <div className="min-w-0">
+                          <div className={`break-all font-semibold ${textPrimary}`}>{apiItem.path}</div>
+                          <div className={`mt-1 text-xs leading-5 ${textSecondary}`}>{apiItem.desc}</div>
                         </div>
                       </div>
                     </div>
@@ -351,10 +353,10 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                       key={integration.id}
                       className={`rounded-[22px] border p-4 ${cardSurface}`}
                     >
-                      <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                        <div>
+                      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                        <div className="min-w-0">
                           <div className={`font-semibold ${textPrimary}`}>{integration.name}</div>
-                          <div className={`mt-1 text-xs ${textSecondary}`}>
+                          <div className={`mt-1 break-all text-xs leading-5 ${textSecondary}`}>
                             {integration.base_url}
                           </div>
                         </div>
@@ -391,7 +393,7 @@ const StatusCard = ({
         : 'bg-amber-500/10 text-amber-600';
 
   return (
-    <div className="rounded-[22px] bg-slate-50/70 p-4 dark:bg-white/5">
+    <div className="rounded-[22px] border border-slate-200/70 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/5">
       <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{label}</div>
       <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-sm font-bold ${toneClass}`}>
         {value}
@@ -400,9 +402,21 @@ const StatusCard = ({
   );
 };
 
-const DetailRow = ({ label, value }: { label: string; value: string }) => (
-  <div className="flex items-start justify-between gap-4 rounded-[20px] bg-slate-50/70 px-4 py-3 dark:bg-white/5">
-    <span className="text-slate-500">{label}</span>
-    <span className="text-right font-medium text-slate-900 dark:text-slate-100">{value}</span>
+const DetailRow = ({
+  label,
+  value,
+  valueClassName = '',
+}: {
+  label: string;
+  value: string;
+  valueClassName?: string;
+}) => (
+  <div className="rounded-[20px] border border-slate-200/70 bg-slate-50/80 px-4 py-3 dark:border-white/10 dark:bg-white/5">
+    <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-slate-400">{label}</div>
+    <div
+      className={`mt-2 text-sm leading-6 text-slate-900 dark:text-slate-100 ${valueClassName || 'font-semibold break-words'}`}
+    >
+      {value}
+    </div>
   </div>
 );

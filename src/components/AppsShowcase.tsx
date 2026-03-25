@@ -227,36 +227,36 @@ export const AppsShowcase = ({
 
     if (isMineView) {
       return (
-        <div className="mt-4 grid gap-2">
+        <div className="mt-3 grid gap-1.5">
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleRun(app)}
-              className="inline-flex items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+              className={actionPrimaryClass}
             >
-              <Play size={14} />
+              <Play size={13} />
               运行
             </button>
             <button
               onClick={() => openEditModal(app)}
-              className={`inline-flex items-center justify-center gap-2 rounded-[16px] border px-3 py-2.5 text-xs font-bold ${tileSurface} ${textPrimary}`}
+              className={actionSecondaryClass}
             >
-              <PencilLine size={14} />
+              <PencilLine size={13} />
               编辑
             </button>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <button
               onClick={() => handleCopy(app)}
-              className={`inline-flex items-center justify-center gap-2 rounded-[16px] border px-3 py-2.5 text-xs font-bold ${tileSurface} ${textPrimary}`}
+              className={actionSecondaryClass}
             >
-              <Copy size={14} />
+              <Copy size={13} />
               复制
             </button>
             <button
               onClick={() => handleUninstall(app)}
-              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-rose-200 px-3 py-2.5 text-xs font-bold text-rose-500"
+              className={actionDangerClass}
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
               卸载
             </button>
           </div>
@@ -267,19 +267,19 @@ export const AppsShowcase = ({
     if (isMarketView) {
       if (app.installed) {
         return (
-          <div className="mt-4 grid grid-cols-2 gap-2">
+          <div className="mt-3 grid grid-cols-2 gap-2">
             <button
               onClick={() => handleRun(app)}
-              className="inline-flex items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+              className={actionPrimaryClass}
             >
-              <Play size={14} />
+              <Play size={13} />
               运行
             </button>
             <button
               onClick={() => handleUninstall(app)}
-              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-rose-200 px-3 py-2.5 text-xs font-bold text-rose-500"
+              className={actionDangerClass}
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
               卸载
             </button>
           </div>
@@ -287,10 +287,10 @@ export const AppsShowcase = ({
       }
 
       return (
-        <div className="mt-4 flex gap-2">
+        <div className="mt-3 flex gap-2">
           <button
             onClick={() => handleInstall(app.id)}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20 disabled:opacity-60"
+            className={`${actionPrimaryClass} flex-1 disabled:opacity-60`}
             disabled={app.installed}
           >
             {app.installed ? '已安装' : '安装'}
@@ -300,28 +300,28 @@ export const AppsShowcase = ({
     }
 
     return (
-      <div className="mt-4 flex gap-2">
+      <div className="mt-3 flex gap-2">
         {app.installed ? (
           <>
             <button
               onClick={() => handleRun(app)}
-              className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+              className={`${actionPrimaryClass} flex-1`}
             >
-              <Play size={14} />
+              <Play size={13} />
               运行
             </button>
             <button
               onClick={() => handleUninstall(app)}
-              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-rose-200 px-3 py-2.5 text-xs font-bold text-rose-500"
+              className={actionDangerClass}
             >
-              <Trash2 size={14} />
+              <Trash2 size={13} />
               卸载
             </button>
           </>
         ) : (
           <button
             onClick={() => handleInstall(app.id)}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+            className={`${actionPrimaryClass} flex-1`}
           >
             安装
           </button>
@@ -369,24 +369,24 @@ export const AppsShowcase = ({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-        <div className="grid grid-cols-[repeat(auto-fit,minmax(232px,272px))] content-start justify-start gap-4 pb-1">
+        <div className="grid grid-cols-[repeat(auto-fit,minmax(196px,220px))] content-start justify-start gap-3 pb-1">
           {visibleApps.map((app) => {
             const Icon = iconMap[app.icon];
 
             return (
               <article
                 key={app.id}
-                className={`flex min-h-[228px] flex-col rounded-[28px] border px-5 py-4 shadow-sm ${tileSurface}`}
+                className={`flex min-h-[198px] flex-col rounded-[24px] border px-4 py-4 shadow-[0_18px_40px_-32px_rgba(15,23,42,0.55)] ${tileSurface}`}
               >
                 <div className="flex items-start justify-between gap-3">
                   <div
-                    className={`flex h-14 w-14 items-center justify-center rounded-[20px] border shadow-sm ${
+                    className={`flex h-12 w-12 items-center justify-center rounded-[18px] border shadow-sm ${
                       isDarkMode
                         ? 'border-white/10 bg-white/5'
                         : 'border-slate-200/70 bg-white'
                     }`}
                   >
-                    <Icon size={22} className="text-blue-600" />
+                    <Icon size={20} className="text-blue-600" />
                   </div>
 
                   <div className="flex items-center gap-2">
@@ -404,14 +404,14 @@ export const AppsShowcase = ({
                   </div>
                 </div>
 
-                <div className="mt-5 flex-1">
-                  <h3 className={`text-[17px] font-black tracking-tight ${textPrimary}`}>
+                <div className="mt-4 flex-1">
+                  <h3 className={`text-[16px] font-black tracking-tight ${textPrimary}`}>
                     {app.title}
                   </h3>
-                  <p className={`mt-2 h-10 overflow-hidden text-sm leading-5 ${textSecondary}`}>
+                  <p className={`mt-1.5 h-10 overflow-hidden text-[13px] leading-5 ${textSecondary}`}>
                     {app.description}
                   </p>
-                  <div className={`mt-3 text-xs font-semibold ${textSecondary}`}>
+                  <div className={`mt-2 text-[11px] font-semibold ${textSecondary}`}>
                     {recentUpdateLabel}
                   </div>
                 </div>
@@ -424,23 +424,23 @@ export const AppsShowcase = ({
           {appCenterState.activeTab === 'mine' && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className={`flex min-h-[228px] flex-col items-center justify-center rounded-[28px] border border-dashed px-5 py-4 text-center transition ${
+              className={`flex min-h-[198px] flex-col items-center justify-center rounded-[24px] border border-dashed px-4 py-4 text-center transition ${
                 isDarkMode
                   ? 'border-white/12 bg-white/[0.03] hover:bg-white/[0.05]'
                   : 'border-slate-200 bg-white/35 hover:bg-white/60'
               }`}
             >
               <div
-                className={`flex h-16 w-16 items-center justify-center rounded-full ${
+                className={`flex h-14 w-14 items-center justify-center rounded-full ${
                   isDarkMode ? 'bg-white/8 text-slate-300' : 'bg-slate-100 text-slate-400'
                 }`}
               >
-                <Plus size={28} />
+                <Plus size={24} />
               </div>
-              <div className={`mt-6 text-[17px] font-black tracking-tight ${textPrimary}`}>
+              <div className={`mt-4 text-[16px] font-black tracking-tight ${textPrimary}`}>
                 创建新应用
               </div>
-              <div className={`mt-2 max-w-[180px] text-sm leading-5 ${textSecondary}`}>
+              <div className={`mt-2 max-w-[170px] text-[13px] leading-5 ${textSecondary}`}>
                 用 AI Coding 或自定义流程快速补充你的业务应用。
               </div>
             </button>

@@ -160,12 +160,12 @@ const collectEnergyQuickProjects = (
   const isProjectPath = context.path.some((segment) => /org|project/i.test(segment));
   const hasProjectShape = isProjectPath || projectShapeKeys.some((key) => key in value);
 
-  if (channel === 'C2' && hasProjectShape && name && orgId) {
+  if (hasProjectShape && name && orgId) {
     const dedupeKey = `${orgId}::${name}`;
 
     if (!seen.has(dedupeKey)) {
       seen.add(dedupeKey);
-      projects.push({ channel, name, orgId });
+      projects.push({ channel: channel || 'UNKNOWN', name, orgId });
     }
   }
 
@@ -180,7 +180,11 @@ const collectEnergyQuickProjects = (
 const extractEnergyQuickProjects = (payload: unknown) => {
   const projects: EnergyQuickProject[] = [];
   collectEnergyQuickProjects(payload, projects, new Set<string>());
-  return projects.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+  const preferredProjects = projects.some((project) => project.channel === 'C2')
+    ? projects.filter((project) => project.channel === 'C2')
+    : projects;
+
+  return preferredProjects.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
 };
 
 const getUpstreamBusinessError = (payload: unknown) => {
@@ -196,6 +200,39 @@ const getUpstreamBusinessError = (payload: unknown) => {
 
   const message = getFirstNonEmptyString(payload, ['msg', 'message', 'error', 'errorMessage']);
   return message ? `${message} (code: ${code})` : `Upstream business error (code: ${code})`;
+};
+
+const describeUpstreamFetchError = (error: unknown, upstreamUrl: string) => {
+  const fallbackMessage = `Failed to fetch upstream service: ${upstreamUrl}`;
+
+  if (!(error instanceof Error)) {
+    return fallbackMessage;
+  }
+
+  const cause = isPlainObject(error.cause) ? error.cause : null;
+  const causeCode = cause ? getFirstNonEmptyString(cause, ['code']) : '';
+  const causeHost = cause ? getFirstNonEmptyString(cause, ['host']) : '';
+  const causePort = cause ? getFirstNonEmptyString(cause, ['port']) : '';
+  const causeMessage = cause ? getFirstNonEmptyString(cause, ['message']) : '';
+  const target = causeHost ? `${causeHost}${causePort ? `:${causePort}` : ''}` : upstreamUrl;
+
+  if (
+    causeCode === 'ECONNRESET' ||
+    error.message.toLowerCase().includes('tls') ||
+    causeMessage.toLowerCase().includes('tls')
+  ) {
+    return `TLS handshake failed while connecting to ${target}. The current environment may need Longfor intranet or VPN access.`;
+  }
+
+  if (causeCode === 'ENOTFOUND') {
+    return `Cannot resolve upstream host for ${upstreamUrl}. Check LONGFOR_USER_INFO_URL.`;
+  }
+
+  if (causeCode === 'ETIMEDOUT') {
+    return `Connection timed out while reaching ${target}.`;
+  }
+
+  return causeCode ? `${error.message} (${causeCode})` : error.message || fallbackMessage;
 };
 
 app.use(cors({ origin: resolveCorsOrigin() }));
@@ -437,10 +474,7 @@ app.get('/api/energy/quick-projects', async (_request, response) => {
     });
   } catch (error) {
     response.status(502).json({
-      error:
-        error instanceof Error
-          ? error.message
-          : 'Failed to fetch Longfor quick-query projects.',
+      error: describeUpstreamFetchError(error, env.longforUserInfoUrl),
       projects: [],
       upstreamStatus: 502,
       upstreamUrl: env.longforUserInfoUrl,
