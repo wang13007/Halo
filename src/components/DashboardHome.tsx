@@ -48,9 +48,9 @@ type WidgetPalette = WidgetPaletteDefinition & {
 const sizeButtonOptions: WidgetSize[] = ['small', 'medium', 'large'];
 
 const widgetHeightClassMap: Record<WidgetSize, string> = {
-  large: 'h-[286px]',
-  medium: 'h-[238px]',
-  small: 'h-[208px]',
+  large: 'min-h-[220px] md:aspect-[2.12/1] md:h-auto',
+  medium: 'min-h-[204px] md:aspect-[2.12/1] md:h-auto',
+  small: 'min-h-[204px] md:aspect-square md:h-auto',
 };
 
 const widgetTitleClassMap: Record<WidgetSize, string> = {
@@ -60,9 +60,9 @@ const widgetTitleClassMap: Record<WidgetSize, string> = {
 };
 
 const widgetMetricClassMap: Record<WidgetSize, string> = {
-  large: 'text-[40px]',
-  medium: 'text-[32px]',
-  small: 'text-[26px]',
+  large: 'text-[36px]',
+  medium: 'text-[30px]',
+  small: 'text-[24px]',
 };
 
 const widgetItemLimitMap: Record<WidgetSize, number> = {
@@ -74,7 +74,7 @@ const widgetItemLimitMap: Record<WidgetSize, number> = {
 const widgetHelperLineClampMap: Record<WidgetSize, number> = {
   large: 2,
   medium: 2,
-  small: 2,
+  small: 1,
 };
 
 const widgetDescriptionLineClampMap: Record<WidgetSize, number> = {
@@ -87,11 +87,6 @@ const sizeDescriptionMap: Record<WidgetSize, string> = {
   large: '整行展示，适合综合摘要、图表或诊断卡片',
   medium: '半行布局，适合重点提示与双列信息',
   small: '轻量指标卡，适合数字、状态和快速结论',
-};
-
-const widgetCategoryLabelMap: Record<DashboardWidget['category'], string> = {
-  custom: '自定义',
-  system: '系统',
 };
 
 const widgetPaletteMap: Record<string, WidgetPaletteDefinition> = {
@@ -256,10 +251,6 @@ const DashboardWidgetCard = ({
   const metricClassName = widgetMetricClassMap[widget.size];
   const descriptionLines = widgetDescriptionLineClampMap[widget.size];
   const showDescription = descriptionLines > 0;
-  const badgeLabel =
-    mode === 'preview'
-      ? `${widgetSizeLabelMap[widget.size]}尺寸`
-      : widgetCategoryLabelMap[widget.category];
 
   return (
     <article
@@ -288,30 +279,23 @@ const DashboardWidgetCard = ({
             </div>
           </div>
 
-          <div className="mt-auto">
-            <div className="flex items-end justify-between gap-3">
-              <div className={`min-w-0 font-black leading-none tracking-tight ${metricClassName} ${textPrimary}`}>
-                {widget.value}
+            <div className="mt-auto">
+              <div className="flex items-end justify-between gap-3">
+                <div className={`min-w-0 font-black leading-none tracking-tight ${metricClassName} ${textPrimary}`}>
+                  {widget.value}
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {mode === 'preview' && onRemove && (
+                    <button
+                      type="button"
+                      onClick={onRemove}
+                      className={`rounded-full border px-3 py-1 text-[11px] font-bold transition ${removeButtonSurface}`}
+                    >
+                      移出
+                    </button>
+                  )}
+                </div>
               </div>
-              <div className="flex shrink-0 items-center gap-2">
-                <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.16em] ${palette.pillClass}`}>
-                  {widgetSizeLabelMap[widget.size]}尺寸
-                </span>
-                {mode === 'preview' && onRemove ? (
-                  <button
-                    type="button"
-                    onClick={onRemove}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-bold transition ${removeButtonSurface}`}
-                  >
-                    移出
-                  </button>
-                ) : (
-                  <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold tracking-[0.16em] ${chromeSurface} ${textPrimary}`}>
-                    {badgeLabel}
-                  </span>
-                )}
-              </div>
-            </div>
 
             <p
               className={`mt-2 text-sm font-medium leading-5 ${textSecondary}`}
