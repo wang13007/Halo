@@ -37,7 +37,7 @@ type HistoryItem = {
 const fallbackProjectOptions: EnergyQuickProject[] = [
   {
     channel: 'C2',
-    name: 'A区',
+    name: '当前项目',
     orgId: 'L-SH00-SHZXM00.04',
   },
 ];
@@ -69,15 +69,14 @@ const quickIntents: Array<{
   },
 ];
 
-const historyItems: HistoryItem[] = [
+const createHistoryItems = (projectName: string): HistoryItem[] => [
   {
-    assistantReply:
-      '今天 A 区的暖通空调仍是主要负荷来源，建议优先检查 13:00 之后的运行策略，并比对照明负荷是否同步上升。',
+    assistantReply: `今天 ${projectName} 的暖通空调仍是主要负荷来源，建议优先检查 13:00 之后的运行策略，并比对照明负荷是否同步上升。`,
     id: 1,
     summary: '今日趋势与异常波动复盘',
     time: '10 分钟前',
-    title: 'A 区今日能耗概览',
-    userPrompt: '帮我总结今天 A 区的能耗重点。',
+    title: `${projectName}今日能耗概览`,
+    userPrompt: `帮我总结今天 ${projectName} 的能耗重点。`,
   },
   {
     assistantReply:
@@ -158,7 +157,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   );
 
   useEffect(() => {
-    if (!selectedIntent || hasLoadedProjects) {
+    if (hasLoadedProjects) {
       return;
     }
 
@@ -220,7 +219,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       isMounted = false;
       requestController.abort();
     };
-  }, [hasLoadedProjects, selectedIntent]);
+  }, [hasLoadedProjects]);
 
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
   const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
@@ -228,6 +227,12 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     ? 'border-white/10 bg-slate-900/70'
     : 'border-white/80 bg-white/84';
   const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
+  const currentProjectName =
+    chatForm.project || projectOptions[0]?.name || fallbackProjectOptions[0].name;
+  const historyItems = useMemo(
+    () => createHistoryItems(currentProjectName),
+    [currentProjectName],
+  );
 
   const selectedIntentMeta = useMemo(
     () => quickIntents.find((intent) => intent.id === selectedIntent) ?? null,
@@ -367,24 +372,23 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
         <div className="flex shrink-0 items-center justify-between px-5 py-5">
           <div>
             <h2 className={`text-xl font-black tracking-tight ${textPrimary}`}>对话工作台</h2>
-            <p className={`mt-1 text-sm leading-6 ${textSecondary}`}>
-              默认空白起手，支持快捷意图、筛选条件和 AI 模型问答。
-            </p>
           </div>
-          <button
-            onClick={() => setIsHistoryExpanded((previous) => !previous)}
-            className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
-          >
-            {isHistoryExpanded ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-            {isHistoryExpanded ? '收起历史' : '展开历史'}
-          </button>
+          {!isHistoryExpanded && (
+            <button
+              onClick={() => setIsHistoryExpanded(true)}
+              className={`inline-flex items-center gap-2 rounded-2xl border px-4 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
+            >
+              <ChevronLeft size={16} />
+              展开历史
+            </button>
+          )}
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-5 pb-5">
           <div className={`min-h-0 flex-1 overflow-y-auto rounded-[24px] ${mutedSurface} p-4`}>
             {chatMessages.length === 0 && !isThinking ? (
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center">
-                <h3 className={`text-2xl font-black tracking-tight ${textPrimary}`}>今天想聊什么?</h3>
+                <h3 className={`text-2xl font-black tracking-tight ${textPrimary}`}>今天想聊什么，Halo？</h3>
                 <p className={`mt-2 max-w-xl text-sm leading-6 ${textSecondary}`}>
                   输入问题后即可开始对话，点击输入框也会显示常用快捷意图。
                 </p>
@@ -547,7 +551,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               onClick={() => setShowIntentPanel(true)}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleComposerKeyDown}
-              placeholder="输入你的问题，例如：帮我诊断今天 A 区暖通空调的异常用能。"
+              placeholder={`输入你的问题，例如：帮我诊断今天 ${currentProjectName} 暖通空调的异常用能。`}
               className={`h-24 w-full resize-none rounded-[20px] border px-4 py-3 text-sm leading-6 focus:outline-none ${cardSurface} ${textPrimary}`}
             />
 
@@ -581,8 +585,17 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               <h3 className={`text-lg font-black ${textPrimary}`}>历史对话</h3>
               <p className={`mt-1 text-sm ${textSecondary}`}>保留最近常用的工作记录。</p>
             </div>
-            <div className={`rounded-2xl p-3 ${mutedSurface}`}>
-              <Clock3 size={18} className={isDarkMode ? 'text-slate-200' : 'text-slate-600'} />
+            <div className="flex items-center gap-2">
+              <div className={`rounded-2xl p-3 ${mutedSurface}`}>
+                <Clock3 size={18} className={isDarkMode ? 'text-slate-200' : 'text-slate-600'} />
+              </div>
+              <button
+                onClick={() => setIsHistoryExpanded(false)}
+                className={`inline-flex items-center gap-2 rounded-2xl border px-3.5 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
+              >
+                <ChevronRight size={16} />
+                收起历史
+              </button>
             </div>
           </div>
 
