@@ -79,6 +79,11 @@ export const AppsShowcase = ({
     ? 'border-white/10 bg-slate-900/75'
     : 'border-slate-200/70 bg-white/90';
   const tabRailSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-100/80';
+  const actionPrimaryClass =
+    'inline-flex items-center justify-center gap-1.5 rounded-[14px] bg-blue-600 px-3 py-2 text-[11px] font-bold text-white shadow-lg shadow-blue-500/20';
+  const actionSecondaryClass = `inline-flex items-center justify-center gap-1.5 rounded-[14px] border px-3 py-2 text-[11px] font-bold ${tileSurface} ${textPrimary}`;
+  const actionDangerClass =
+    'inline-flex items-center justify-center gap-1.5 rounded-[14px] border border-rose-200 px-3 py-2 text-[11px] font-bold text-rose-500';
 
   const visibleApps = useMemo(() => {
     if (appCenterState.activeTab === 'favorites') {
