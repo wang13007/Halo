@@ -116,6 +116,11 @@ export const AppsShowcase = ({
     }));
   };
 
+  const handleUninstall = (app: AppItem) => {
+    removeApp(app.id);
+    setStatusMessage(`已卸载应用：${app.title}`);
+  };
+
   const handleToggleFavorite = (appId: string) => {
     updateApp(appId, (app) => ({ ...app, favorite: !app.favorite }));
   };
@@ -243,11 +248,11 @@ export const AppsShowcase = ({
               复制
             </button>
             <button
-              onClick={() => removeApp(app.id)}
+              onClick={() => handleUninstall(app)}
               className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-rose-200 px-3 py-2.5 text-xs font-bold text-rose-500"
             >
               <Trash2 size={14} />
-              删除
+              卸载
             </button>
           </div>
         </div>
@@ -255,6 +260,27 @@ export const AppsShowcase = ({
     }
 
     if (isMarketView) {
+      if (app.installed) {
+        return (
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              onClick={() => handleRun(app)}
+              className="inline-flex items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+            >
+              <Play size={14} />
+              运行
+            </button>
+            <button
+              onClick={() => handleUninstall(app)}
+              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-rose-200 px-3 py-2.5 text-xs font-bold text-rose-500"
+            >
+              <Trash2 size={14} />
+              卸载
+            </button>
+          </div>
+        );
+      }
+
       return (
         <div className="mt-4 flex gap-2">
           <button
@@ -271,13 +297,22 @@ export const AppsShowcase = ({
     return (
       <div className="mt-4 flex gap-2">
         {app.installed ? (
-          <button
-            onClick={() => handleRun(app)}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
-          >
-            <Play size={14} />
-            运行
-          </button>
+          <>
+            <button
+              onClick={() => handleRun(app)}
+              className="inline-flex flex-1 items-center justify-center gap-2 rounded-[16px] bg-blue-600 px-3 py-2.5 text-xs font-bold text-white shadow-lg shadow-blue-500/20"
+            >
+              <Play size={14} />
+              运行
+            </button>
+            <button
+              onClick={() => handleUninstall(app)}
+              className="inline-flex items-center justify-center gap-2 rounded-[16px] border border-rose-200 px-3 py-2.5 text-xs font-bold text-rose-500"
+            >
+              <Trash2 size={14} />
+              卸载
+            </button>
+          </>
         ) : (
           <button
             onClick={() => handleInstall(app.id)}
