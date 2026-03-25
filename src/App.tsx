@@ -36,7 +36,7 @@ const pageMetaMap: Record<PageId, { description: string; title: string }> = {
     title: '系统配置',
   },
   dashboard: {
-    description: '在可切换的自定义看板中组织小组件，按固定栅格自动对齐布局。',
+    description: '',
     title: '看板',
   },
   subscription: {
@@ -214,9 +214,11 @@ const App = () => {
                 <h1 className={`mt-3 text-2xl font-black tracking-tight lg:text-[30px] ${textPrimary}`}>
                   {pageMeta.title}
                 </h1>
-                <p className={`mt-2 max-w-3xl text-sm leading-6 ${textSecondary}`}>
-                  {pageMeta.description}
-                </p>
+                {pageMeta.description && (
+                  <p className={`mt-2 max-w-3xl text-sm leading-6 ${textSecondary}`}>
+                    {pageMeta.description}
+                  </p>
+                )}
               </div>
 
               <div className="flex gap-3">{renderHeaderAction()}</div>

@@ -1,7 +1,6 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, type CSSProperties } from 'react';
 import {
   Activity,
-  ArrowUpRight,
   BarChart3,
   Bolt,
   GripVertical,
@@ -49,27 +48,39 @@ type WidgetPalette = WidgetPaletteDefinition & {
 const sizeButtonOptions: WidgetSize[] = ['small', 'medium', 'large'];
 
 const widgetHeightClassMap: Record<WidgetSize, string> = {
-  large: 'min-h-[330px]',
-  medium: 'min-h-[290px]',
-  small: 'min-h-[250px]',
+  large: 'h-[286px]',
+  medium: 'h-[238px]',
+  small: 'h-[208px]',
 };
 
 const widgetTitleClassMap: Record<WidgetSize, string> = {
-  large: 'text-[30px]',
-  medium: 'text-[24px]',
-  small: 'text-[22px]',
+  large: 'text-[22px]',
+  medium: 'text-[18px]',
+  small: 'text-[16px]',
 };
 
-const widgetValueClassMap: Record<WidgetSize, string> = {
-  large: 'text-sm',
-  medium: 'text-sm',
-  small: 'text-xs',
+const widgetMetricClassMap: Record<WidgetSize, string> = {
+  large: 'text-[40px]',
+  medium: 'text-[32px]',
+  small: 'text-[26px]',
 };
 
 const widgetItemLimitMap: Record<WidgetSize, number> = {
-  large: 4,
-  medium: 3,
-  small: 3,
+  large: 3,
+  medium: 2,
+  small: 1,
+};
+
+const widgetHelperLineClampMap: Record<WidgetSize, number> = {
+  large: 2,
+  medium: 2,
+  small: 2,
+};
+
+const widgetDescriptionLineClampMap: Record<WidgetSize, number> = {
+  large: 2,
+  medium: 1,
+  small: 0,
 };
 
 const sizeDescriptionMap: Record<WidgetSize, string> = {
@@ -91,6 +102,16 @@ const widgetPaletteMap: Record<string, WidgetPaletteDefinition> = {
   'widget-actions': { chipLabel: '执行清单', icon: ListTodo, tone: 'slate' },
   'widget-rhythm': { chipLabel: '运行节奏', icon: Activity, tone: 'blue' },
 };
+
+const clampTextStyle = (lines: number): CSSProperties =>
+  lines <= 0
+    ? {}
+    : {
+        WebkitBoxOrient: 'vertical',
+        WebkitLineClamp: lines,
+        display: '-webkit-box',
+        overflow: 'hidden',
+      };
 
 const isDragPayload = (value: unknown): value is DragPayload => {
   if (!value || typeof value !== 'object') {
@@ -218,89 +239,112 @@ const DashboardWidgetCard = ({
   const hiddenItemsCount = Math.max(widget.items.length - visibleItems.length, 0);
   const palette = getWidgetPalette(widget, isDarkMode);
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
-  const textSecondary = isDarkMode ? 'text-slate-300' : 'text-slate-600';
+  const textSecondary = isDarkMode ? 'text-slate-200/90' : 'text-slate-700';
   const textTertiary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
   const outerSurface = isDarkMode
-    ? 'border-white/10 bg-slate-950/45 shadow-[0_30px_70px_-42px_rgba(15,23,42,0.95)]'
-    : 'border-white/90 bg-white/80 shadow-[0_28px_70px_-42px_rgba(15,23,42,0.35)]';
-  const innerSurface = isDarkMode ? 'border-white/10 bg-white/[0.05]' : 'border-white/80 bg-white/72';
-  const metaSurface = isDarkMode
-    ? 'border-white/10 bg-slate-950/45 text-slate-300'
-    : 'border-slate-200/70 bg-white/76 text-slate-600';
+    ? 'border-white/10 bg-slate-950/50 shadow-[0_26px_60px_-40px_rgba(15,23,42,0.92)]'
+    : 'border-white/95 bg-white/78 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.28)]';
+  const chromeSurface = isDarkMode
+    ? 'border-white/10 bg-white/[0.08]'
+    : 'border-white/80 bg-white/58';
+  const itemSurface = isDarkMode
+    ? 'border-white/10 bg-white/[0.08] text-slate-100'
+    : 'border-white/85 bg-white/64 text-slate-700';
   const removeButtonSurface = isDarkMode
-    ? 'bg-white/8 text-slate-100 hover:bg-white/12'
-    : 'bg-slate-900 text-white hover:bg-slate-700';
-  const footerText =
-    hiddenItemsCount > 0
-      ? `还有 ${hiddenItemsCount} 项摘要待展开`
-      : mode === 'preview'
-        ? '拖拽卡片可调整当前顺序'
-        : '当前卡片内容已完整展示';
+    ? 'border-white/10 bg-slate-950/55 text-slate-100 hover:bg-slate-950/70'
+    : 'border-white/80 bg-white/70 text-slate-700 hover:bg-white';
+  const metricClassName = widgetMetricClassMap[widget.size];
+  const descriptionLines = widgetDescriptionLineClampMap[widget.size];
+  const showDescription = descriptionLines > 0;
+  const badgeLabel =
+    mode === 'preview'
+      ? `${widgetSizeLabelMap[widget.size]}尺寸`
+      : widgetCategoryLabelMap[widget.category];
 
   return (
     <article
       className={`${widgetSizeClassMap[widget.size]} ${widgetHeightClassMap[widget.size]} relative overflow-hidden rounded-[30px] border p-1 transition duration-300 ${
-        mode === 'board' ? 'hover:-translate-y-1 hover:shadow-[0_34px_74px_-44px_rgba(15,23,42,0.45)]' : ''
+        mode === 'board' ? 'hover:-translate-y-1 hover:shadow-[0_28px_70px_-42px_rgba(15,23,42,0.34)]' : ''
       } ${highlight ? 'ring-2 ring-cyan-400/40' : ''} ${outerSurface}`}
     >
-      <div className={`relative flex h-full flex-col overflow-hidden rounded-[26px] bg-gradient-to-br ${widget.accent} p-5`}>
-        <div className={`pointer-events-none absolute -right-8 -top-10 h-28 w-28 rounded-full blur-3xl ${palette.glowClass}`} />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.32),transparent_42%)] opacity-80" />
+      <div className={`relative flex h-full flex-col overflow-hidden rounded-[26px] bg-gradient-to-br ${widget.accent} p-4`}>
+        <div className={`pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full blur-3xl ${palette.glowClass}`} />
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.26),transparent_42%)] opacity-80" />
         <div className="relative flex h-full flex-col">
-          <div className="flex items-start justify-between gap-4">
+          <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1 text-[11px] font-black tracking-[0.18em] ${palette.pillClass}`}>
-                  <palette.icon size={13} />
-                  {palette.chipLabel}
-                </span>
-                <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold tracking-[0.16em] ${metaSurface}`}>
-                  {widgetCategoryLabelMap[widget.category]} · {widgetSizeLabelMap[widget.size]}尺寸
-                </span>
+              <div className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${textTertiary}`}>
+                {palette.chipLabel}
               </div>
-              <h2 className={`mt-4 break-words font-black leading-[1.05] tracking-tight ${widgetTitleClassMap[widget.size]} ${textPrimary}`}>
+              <h2 className={`mt-2 break-words font-semibold leading-tight ${widgetTitleClassMap[widget.size]} ${textPrimary}`}>
                 {widget.title}
               </h2>
             </div>
+
             <div className="flex shrink-0 items-center gap-2">
-              {mode === 'preview' && (
-                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border ${metaSurface}`}>
-                  <GripVertical size={16} />
-                </div>
-              )}
-              <div className={`rounded-full px-3.5 py-2 font-bold ${widgetValueClassMap[widget.size]} ${palette.pillClass}`}>{widget.value}</div>
-            </div>
-          </div>
-          <p className={`mt-4 text-sm leading-6 ${textSecondary}`}>{widget.description}</p>
-          <div className={`mt-4 flex items-center gap-3 rounded-[20px] border p-4 ${innerSurface}`}>
-            <div className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl ${palette.iconWrapClass}`}>
-              <palette.icon size={18} />
-            </div>
-            <div className="min-w-0">
-              <div className={`text-xs font-bold uppercase tracking-[0.18em] ${textTertiary}`}>辅助提示</div>
-              <div className={`mt-1 text-sm font-semibold leading-6 ${textPrimary}`}>{widget.helper}</div>
-            </div>
-            {mode === 'board' && <ArrowUpRight size={16} className={textTertiary} />}
-          </div>
-          <div className="mt-4 grid gap-2.5">
-            {visibleItems.map((item, index) => (
-              <div key={`${widget.id}-${index}`} className={`flex items-start gap-3 rounded-[18px] border p-3.5 ${innerSurface}`}>
-                <span className={`mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full ${palette.dotClass}`} />
-                <span className={`text-sm leading-6 ${textPrimary}`}>{item}</span>
+              <div className={`inline-flex h-10 w-10 items-center justify-center rounded-[18px] border ${chromeSurface} ${textPrimary}`}>
+                {mode === 'preview' ? <GripVertical size={16} /> : <palette.icon size={18} />}
               </div>
-            ))}
+            </div>
           </div>
-          <div className="mt-auto flex flex-wrap items-center justify-between gap-3 pt-4">
-            <div className={`text-xs font-medium ${textTertiary}`}>{footerText}</div>
-            {mode === 'preview' ? (
-              <button type="button" onClick={onRemove} className={`rounded-full px-3.5 py-1.5 text-xs font-bold transition ${removeButtonSurface}`}>
-                移出
-              </button>
-            ) : (
-              <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${metaSurface}`}>
-                {sizeDescriptionMap[widget.size]}
-              </span>
+
+          <div className="mt-auto">
+            <div className="flex items-end justify-between gap-3">
+              <div className={`min-w-0 font-black leading-none tracking-tight ${metricClassName} ${textPrimary}`}>
+                {widget.value}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-bold tracking-[0.16em] ${palette.pillClass}`}>
+                  {widgetSizeLabelMap[widget.size]}尺寸
+                </span>
+                {mode === 'preview' && onRemove ? (
+                  <button
+                    type="button"
+                    onClick={onRemove}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-bold transition ${removeButtonSurface}`}
+                  >
+                    移出
+                  </button>
+                ) : (
+                  <span className={`inline-flex items-center rounded-full border px-3 py-1 text-[11px] font-bold tracking-[0.16em] ${chromeSurface} ${textPrimary}`}>
+                    {badgeLabel}
+                  </span>
+                )}
+              </div>
+            </div>
+
+            <p
+              className={`mt-2 text-sm font-medium leading-5 ${textSecondary}`}
+              style={clampTextStyle(widgetHelperLineClampMap[widget.size])}
+            >
+              {widget.helper}
+            </p>
+
+            {showDescription && (
+              <p
+                className={`mt-1.5 text-xs leading-5 ${textTertiary}`}
+                style={clampTextStyle(descriptionLines)}
+              >
+                {widget.description}
+              </p>
             )}
+
+            <div className="mt-4 flex flex-wrap gap-2">
+              {visibleItems.map((item, index) => (
+                <span
+                  key={`${widget.id}-${index}`}
+                  className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${itemSurface}`}
+                >
+                  <span className={`h-2 w-2 shrink-0 rounded-full ${palette.dotClass}`} />
+                  <span className="truncate">{item}</span>
+                </span>
+              ))}
+              {hiddenItemsCount > 0 && (
+                <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${chromeSurface} ${textPrimary}`}>
+                  +{hiddenItemsCount}
+                </span>
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -345,33 +389,6 @@ export const DashboardHome = ({
       .map((widgetId) => widgetMap.get(widgetId))
       .filter((widget): widget is DashboardWidget => Boolean(widget));
   }, [activeTab.widgetIds, dashboardState.widgets]);
-
-  const sizeCounts = useMemo(
-    () =>
-      activeWidgets.reduce<Record<WidgetSize, number>>(
-        (counts, widget) => ({ ...counts, [widget.size]: counts[widget.size] + 1 }),
-        { large: 0, medium: 0, small: 0 },
-      ),
-    [activeWidgets],
-  );
-
-  const dominantSize = useMemo(() => {
-    const entries = Object.entries(sizeCounts) as Array<[WidgetSize, number]>;
-    return entries.sort((left, right) => right[1] - left[1])[0]?.[0] ?? 'small';
-  }, [sizeCounts]);
-
-  const systemWidgetCount = activeWidgets.filter((widget) => widget.category === 'system').length;
-  const customWidgetCount = activeWidgets.length - systemWidgetCount;
-
-  const overviewStats = [
-    { label: '组件数量', value: String(activeWidgets.length).padStart(2, '0'), helper: activeWidgets.length > 0 ? '当前画布已装配的组件数量' : '可以从左侧组件库开始搭建' },
-    { label: '自定义', value: String(customWidgetCount).padStart(2, '0'), helper: customWidgetCount > 0 ? 'AI 定制卡片已经加入布局' : '暂未加入自定义组件' },
-    {
-      label: '布局节奏',
-      value: activeWidgets.length > 0 ? `${widgetSizeLabelMap[dominantSize]}尺寸` : '待配置',
-      helper: activeWidgets.length > 0 ? `${sizeCounts[dominantSize]} 张 ${widgetSizeLabelMap[dominantSize]}尺寸卡片主导当前布局` : '从尺寸切换开始搭配信息节奏',
-    },
-  ];
 
   const reorderWidgets = (widgetIds: string[]) => {
     onChange((previous) => ({
@@ -480,7 +497,7 @@ export const DashboardHome = ({
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
+    <div className="flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex flex-wrap gap-2">
           {dashboardState.tabs.map((tab) => (
@@ -515,62 +532,11 @@ export const DashboardHome = ({
       </div>
 
       <section
-        className={`relative overflow-hidden rounded-[32px] border px-6 py-5 shadow-[0_30px_80px_-48px_rgba(15,23,42,0.4)] ${cardSurface}`}
-      >
-        <div className="pointer-events-none absolute -left-14 top-0 h-44 w-44 rounded-full bg-cyan-400/10 blur-[72px]" />
-        <div className="pointer-events-none absolute right-0 top-0 h-48 w-48 rounded-full bg-violet-400/12 blur-[88px]" />
-
-        <div className="relative flex flex-col gap-6 xl:flex-row xl:items-end xl:justify-between">
-          <div className="max-w-3xl">
-            <div
-              className={`inline-flex items-center gap-2 rounded-full border px-3 py-1 text-xs font-black tracking-[0.18em] ${
-                isDarkMode
-                  ? 'border-cyan-400/20 bg-cyan-400/10 text-cyan-100'
-                  : 'border-cyan-200 bg-cyan-50 text-cyan-700'
-              }`}
-            >
-              <LayoutTemplate size={14} />
-              当前看板
-            </div>
-
-            <h2 className={`mt-4 text-3xl font-black tracking-tight ${textPrimary}`}>{activeTab.name}</h2>
-            <p className={`mt-3 max-w-2xl text-sm leading-6 ${textSecondary}`}>
-              小组件现在会按照更清晰的视觉层级呈现，保留拖拽与尺寸切换能力，同时让数字、提示和摘要更容易一眼读懂。
-            </p>
-
-            <div className={`mt-4 text-sm font-semibold ${textSecondary}`}>
-              系统组件 {systemWidgetCount} 个，自定义组件 {customWidgetCount} 个
-            </div>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-3">
-            {overviewStats.map((stat) => (
-              <div key={stat.label} className={`rounded-[22px] border p-4 ${sectionSurface}`}>
-                <div className={`text-xs font-bold uppercase tracking-[0.18em] ${textSecondary}`}>{stat.label}</div>
-                <div className={`mt-2 text-2xl font-black tracking-tight ${textPrimary}`}>{stat.value}</div>
-                <div className={`mt-2 text-xs leading-5 ${textSecondary}`}>{stat.helper}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <section
-        className={`relative min-h-0 flex-1 overflow-hidden rounded-[32px] border p-5 shadow-[0_30px_80px_-50px_rgba(15,23,42,0.35)] ${cardSurface}`}
+        className={`relative overflow-hidden rounded-[32px] border p-5 shadow-[0_30px_80px_-50px_rgba(15,23,42,0.35)] ${cardSurface}`}
       >
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.08),transparent_42%)]" />
 
-        <div className="relative flex h-full min-h-0 flex-col">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h3 className={`text-lg font-black ${textPrimary}`}>看板画布</h3>
-              <p className={`mt-1 text-sm ${textSecondary}`}>
-                小、中、大组件会按 3 / 6 / 12 栅格自动对齐，滚动区域也统一收敛，不会再出现卡片显示挤压。
-              </p>
-            </div>
-            <div className={`text-sm font-medium ${textSecondary}`}>布局主节奏：{widgetSizeLabelMap[dominantSize]}尺寸</div>
-          </div>
-
+        <div className="relative flex flex-col">
           {activeWidgets.length === 0 ? (
             <div className={`flex h-full min-h-[360px] items-center justify-center rounded-[28px] border border-dashed p-6 ${dashedSurface}`}>
               <div className="max-w-md text-center">
@@ -588,7 +554,7 @@ export const DashboardHome = ({
               </div>
             </div>
           ) : (
-            <div className="grid min-h-0 flex-1 content-start auto-rows-fr gap-4 overflow-y-auto pr-1 md:grid-cols-6 xl:grid-cols-12">
+            <div className="grid content-start items-start gap-4 md:grid-cols-6 xl:grid-cols-12">
               {activeWidgets.map((widget) => (
                 <DashboardWidgetCard
                   key={widget.id}
@@ -896,7 +862,7 @@ export const DashboardHome = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="grid auto-rows-fr gap-4 md:grid-cols-6 xl:grid-cols-12">
+                    <div className="grid content-start items-start gap-4 md:grid-cols-6 xl:grid-cols-12">
                       {activeWidgets.map((widget) => (
                         <div
                           key={widget.id}
