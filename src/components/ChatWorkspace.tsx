@@ -37,7 +37,7 @@ type HistoryItem = {
 const fallbackProjectOptions: EnergyQuickProject[] = [
   {
     channel: 'C2',
-    name: '当前项目',
+    name: '',
     orgId: 'L-SH00-SHZXM00.04',
   },
 ];
@@ -228,10 +228,14 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     : 'border-white/80 bg-white/84';
   const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
   const currentProjectName =
-    chatForm.project || projectOptions[0]?.name || fallbackProjectOptions[0].name;
+    projectOptions.find((project) => project.orgId === chatForm.orgId)?.name ||
+    chatForm.project ||
+    projectOptions[0]?.name ||
+    '';
+  const promptProjectName = currentProjectName || '项目';
   const historyItems = useMemo(
-    () => createHistoryItems(currentProjectName),
-    [currentProjectName],
+    () => createHistoryItems(promptProjectName),
+    [promptProjectName],
   );
 
   const selectedIntentMeta = useMemo(
@@ -388,7 +392,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           <div className={`min-h-0 flex-1 overflow-y-auto rounded-[24px] ${mutedSurface} p-4`}>
             {chatMessages.length === 0 && !isThinking ? (
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center">
-                <h3 className={`text-2xl font-black tracking-tight ${textPrimary}`}>今天想聊什么，Halo？</h3>
+                <h3 className={`text-2xl font-black tracking-tight ${textPrimary}`}>Halo · 云境</h3>
                 <p className={`mt-2 max-w-xl text-sm leading-6 ${textSecondary}`}>
                   输入问题后即可开始对话，点击输入框也会显示常用快捷意图。
                 </p>
@@ -551,7 +555,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               onClick={() => setShowIntentPanel(true)}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleComposerKeyDown}
-              placeholder={`输入你的问题，例如：帮我诊断今天 ${currentProjectName} 暖通空调的异常用能。`}
+              placeholder={`输入你的问题，例如：帮我诊断今天 ${promptProjectName} 暖通空调的异常用能。`}
               className={`h-24 w-full resize-none rounded-[20px] border px-4 py-3 text-sm leading-6 focus:outline-none ${cardSurface} ${textPrimary}`}
             />
 
