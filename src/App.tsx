@@ -22,27 +22,12 @@ import { createInitialDashboardState } from './lib/dashboard';
 
 type PageId = 'apps' | 'chat' | 'config' | 'dashboard' | 'subscription';
 
-const pageMetaMap: Record<PageId, { description: string; title: string }> = {
-  apps: {
-    description: '管理收藏应用、我的应用和应用商店，并通过 AI Coding 快速创建应用。',
-    title: '应用',
-  },
-  chat: {
-    description: '从空白输入开始，结合快捷意图与 AI 模型完成能耗查询、对比、报表和诊断。',
-    title: '智能对话',
-  },
-  config: {
-    description: '集中查看系统接入状态、接口配置和数据准备情况，快速定位链路问题。',
-    title: '系统配置',
-  },
-  dashboard: {
-    description: '',
-    title: '看板',
-  },
-  subscription: {
-    description: '基础版与高级版支持按月、按季、按年订阅。',
-    title: '订阅方案',
-  },
+const pageMetaMap: Record<PageId, { title: string }> = {
+  apps: { title: '应用' },
+  chat: { title: '智能对话' },
+  config: { title: '系统配置' },
+  dashboard: { title: '看板' },
+  subscription: { title: '订阅方案' },
 };
 
 const navigationItems: Array<{
@@ -207,18 +192,9 @@ const App = () => {
           <header className="shrink-0 px-6 pb-3 pt-6 lg:px-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
               <div>
-                <div className="inline-flex items-center gap-2 rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
-                  <Sparkles size={14} />
-                  Halo Web
-                </div>
-                <h1 className={`mt-3 text-2xl font-black tracking-tight lg:text-[30px] ${textPrimary}`}>
+                <h1 className={`text-2xl font-black tracking-tight lg:text-[30px] ${textPrimary}`}>
                   {pageMeta.title}
                 </h1>
-                {pageMeta.description && (
-                  <p className={`mt-2 max-w-3xl text-sm leading-6 ${textSecondary}`}>
-                    {pageMeta.description}
-                  </p>
-                )}
               </div>
 
               <div className="flex gap-3">{renderHeaderAction()}</div>

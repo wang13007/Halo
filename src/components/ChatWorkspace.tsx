@@ -100,7 +100,6 @@ const historyItems: HistoryItem[] = [
 ];
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-const intentTriggerPattern = /[查用点能耗报诊]/;
 
 const normalizeProjectLoadError = (error: unknown) => {
   const fallbackMessage = '项目列表同步失败，已暂时使用默认项目。';
@@ -141,6 +140,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const [projectLoadError, setProjectLoadError] = useState('');
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState<QuickIntentId | null>(null);
+  const [showIntentPanel, setShowIntentPanel] = useState(false);
 
   const activeRequestRef = useRef<AbortController | null>(null);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -228,11 +228,6 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     ? 'border-white/10 bg-slate-900/70'
     : 'border-white/80 bg-white/84';
   const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
-
-  const shouldShowIntentPanel = useMemo(
-    () => Boolean(input.trim()) && intentTriggerPattern.test(input),
-    [input],
-  );
 
   const selectedIntentMeta = useMemo(
     () => quickIntents.find((intent) => intent.id === selectedIntent) ?? null,
@@ -391,7 +386,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center">
                 <h3 className={`text-2xl font-black tracking-tight ${textPrimary}`}>今天想聊什么?</h3>
                 <p className={`mt-2 max-w-xl text-sm leading-6 ${textSecondary}`}>
-                  输入问题后即可开始对话；当输入包含“查、用、点、能、耗、报、诊”等字符时，会自动出现能耗快捷意图。
+                  输入问题后即可开始对话，点击输入框也会显示常用快捷意图。
                 </p>
               </div>
             ) : (
@@ -525,7 +520,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               </div>
             )}
 
-            {shouldShowIntentPanel && (
+            {showIntentPanel && (
               <div className="mb-3 flex flex-wrap gap-2">
                 {quickIntents.map((intent) => (
                   <button
@@ -549,6 +544,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
             <textarea
               ref={composerRef}
               value={input}
+              onClick={() => setShowIntentPanel(true)}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleComposerKeyDown}
               placeholder="输入你的问题，例如：帮我诊断今天 A 区暖通空调的异常用能。"
