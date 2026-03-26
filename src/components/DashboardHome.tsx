@@ -727,13 +727,32 @@ const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
   widget,
 }) => {
   const theme = getDashboardTheme(isDarkMode);
+  const cardInsetSurface = isDarkMode
+    ? 'border-white/10 bg-slate-900/88'
+    : 'border-white/95 bg-white/96';
+  const cardShadowClass = isDarkMode
+    ? 'shadow-[var(--dashboard-shadow-dark)]'
+    : 'shadow-[var(--dashboard-shadow-light)]';
+  const cardHaloOpacityClass = isDarkMode ? 'opacity-30' : 'opacity-20';
+
   return (
     <article
-      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[var(--dashboard-radius-card)] border transition duration-300 md:min-h-0 ${
+      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[var(--dashboard-radius-card)] transition duration-300 md:min-h-0 ${
         mode === 'board' ? 'hover:-translate-y-0.5' : ''
-      } ${highlight ? 'ring-2 ring-cyan-400/55' : ''} ${theme.cardSurface}`}
+      } ${highlight ? 'ring-2 ring-cyan-400/55' : ''} ${cardShadowClass}`}
     >
+      <div
+        className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${widget.accent} ${cardHaloOpacityClass}`}
+      />
+      <div
+        className={`pointer-events-none absolute inset-px rounded-[calc(var(--dashboard-radius-card)-1px)] border ${cardInsetSurface}`}
+      />
       <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${widget.accent}`} />
+      <div
+        className={`pointer-events-none absolute inset-0 rounded-[var(--dashboard-radius-card)] ring-1 ring-inset ${
+          isDarkMode ? 'ring-white/10' : 'ring-slate-900/6'
+        }`}
+      />
       {mode === 'preview' ? <WidgetToolbar isDarkMode={isDarkMode} onRemove={onRemove} /> : null}
       <div className={`relative flex min-h-full flex-col p-[var(--dashboard-card-padding)] ${mode === 'preview' ? 'pr-[88px]' : ''}`}>
         {renderWidgetBody({ isDarkMode, theme, widget })}

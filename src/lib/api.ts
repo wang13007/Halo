@@ -120,6 +120,11 @@ const request = async <T>(path: string, init?: RequestInit): Promise<T> => {
 };
 
 export type HealthResponse = {
+  ai: {
+    configured: boolean;
+    model: string;
+    provider: "gemini";
+  };
   database: {
     configured: boolean;
     projectCount?: number;

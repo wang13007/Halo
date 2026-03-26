@@ -5,6 +5,12 @@ const defaultModel = env.geminiModel || 'gemini-2.5-flash';
 const aiClient = env.googleApiKey
     ? new GoogleGenAI({ apiKey: env.googleApiKey })
     : null;
+export const isAiModelConfigured = () => Boolean(aiClient);
+export const getAiRuntimeStatus = () => ({
+    configured: isAiModelConfigured(),
+    model: defaultModel,
+    provider: 'gemini',
+});
 const sanitizeString = (value, fallback) => typeof value === 'string' && value.trim() ? value.trim() : fallback;
 const sanitizeItems = (value, fallback) => {
     if (!Array.isArray(value)) {
@@ -228,6 +234,12 @@ const generateJson = async (systemInstruction, payload) => {
 export const generateHaloChatReply = async (input) => {
     const fallback = buildFallbackChat(input);
     const reportPromptContext = buildReportTemplatePromptContext(input);
+    if (!aiClient) {
+        return {
+            ...fallback,
+            thinking: `${fallback.thinking}\nAI model is not configured on the server. Set GEMINI_API_KEY to enable Gemini replies.`,
+        };
+    }
     try {
         const parsed = await generateJson(buildChatSystemInstruction(input), {
             ...input,
@@ -278,6 +290,12 @@ const buildFallbackArtifact = (input) => {
 };
 export const generateHaloArtifact = async (input) => {
     const fallback = buildFallbackArtifact(input);
+    if (!aiClient) {
+        return {
+            ...fallback,
+            summary: `${fallback.summary} AI model is not configured on the server.`,
+        };
+    }
     try {
         const parsed = await generateJson([
             '你是 Halo 的 AI Coding 生成器。',

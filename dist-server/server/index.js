@@ -1,8 +1,7 @@
 import cors from "cors";
 import express from "express";
 import { env, isSupabaseConfigured, resolveCorsOrigin } from "./config.js";
-import { generateHaloArtifact, generateHaloChatReply } from "./lib/ai.js";
-import { getSupabase } from "./lib/supabase.js";
+import { generateHaloArtifact, generateHaloChatReply, getAiRuntimeStatus, } from "./lib/ai.js";
 import { createChatSession, createEnergyMetric, createIntegration, createReport, getEnergyQueryConfig, getChatSession, getEnergyAnalysis, listChatSessions, listIntegrations, listProjects, listReports, queryImportedEnergyReport, updateChatSession, } from "./services/halo-service.js";
 const app = express();
 const normalizeCastgc = (rawValue) => {
@@ -82,8 +81,10 @@ app.get("/api", (_request, response) => {
     });
 });
 app.get("/api/health", async (_request, response) => {
+    const aiStatus = getAiRuntimeStatus();
     if (!isSupabaseConfigured()) {
         response.json({
+            ai: aiStatus,
             database: {
                 configured: false,
                 reachable: false,
@@ -95,27 +96,22 @@ app.get("/api/health", async (_request, response) => {
         return;
     }
     try {
-        const supabase = getSupabase();
-        const { data, error } = await supabase
-            .from("projects")
-            .select("id")
-            .limit(1);
-        if (error) {
-            throw error;
-        }
+        const projects = await listProjects();
         response.json({
+            ai: aiStatus,
             database: {
                 configured: true,
                 reachable: true,
                 schemaReady: true,
-                projectCount: data?.length ?? 0,
+                projectCount: projects.length,
             },
             serverTime: new Date().toISOString(),
-            status: "ok",
+            status: aiStatus.configured ? "ok" : "degraded",
         });
     }
     catch (error) {
         response.json({
+            ai: aiStatus,
             database: {
                 configured: true,
                 reachable: false,
@@ -247,6 +243,9 @@ app.get("/api/energy/quick-projects", async (_request, response) => {
                 channel: "DATABASE",
                 name: project.projectName,
                 orgId: project.orgId,
+                projectCode: project.projectCode,
+                projectId: project.projectId,
+                projectName: project.projectName,
             })),
             upstreamStatus: 200,
             upstreamUrl: "supabase://public.energy_query_projects",

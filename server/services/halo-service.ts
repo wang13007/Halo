@@ -575,6 +575,49 @@ const normalizeChatMessages = (messages: unknown): ChatSessionMessage[] => {
 const normalizeMetadata = (value: unknown) =>
   isPlainObject(value) ? value : {};
 
+const sleep = (ms: number) =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+const getErrorMessage = (error: unknown) => {
+  if (error instanceof Error) {
+    return error.message;
+  }
+
+  if (isPlainObject(error) && typeof error.message === "string") {
+    return error.message;
+  }
+
+  return String(error ?? "");
+};
+
+const isRetryableSupabaseError = (error: unknown) =>
+  /(fetch failed|timeout|timed out|econnreset|etimedout|connect timeout|network)/i.test(
+    getErrorMessage(error),
+  );
+
+const withSupabaseRetry = async <T>(
+  operation: () => Promise<T>,
+  attempts = 3,
+): Promise<T> => {
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt === attempts || !isRetryableSupabaseError(error)) {
+        throw error;
+      }
+
+      await sleep(350 * attempt);
+    }
+  }
+
+  throw lastError;
+};
+
 const deriveSessionTitle = (messages: ChatSessionMessage[], title?: string) => {
   if (typeof title === "string" && title.trim()) {
     return truncateText(title, 48);
@@ -663,17 +706,19 @@ const buildChatSessionPayload = (input: ChatSessionInput) => {
 };
 
 export const listProjects = async () => {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("projects")
-    .select("id, code, name, location, timezone")
-    .order("created_at", { ascending: true });
+  return withSupabaseRetry(async () => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("projects")
+      .select("id, code, name, location, timezone")
+      .order("created_at", { ascending: true });
 
-  if (error) {
-    throw error;
-  }
+    if (error) {
+      throw error;
+    }
 
-  return data ?? [];
+    return data ?? [];
+  });
 };
 
 export const resolveProject = async (projectCode?: string) => {
@@ -876,23 +921,25 @@ export const createEnergyMetric = async (input: MetricInput) => {
 };
 
 const loadImportedProjectRows = async (projectIds?: string[]) => {
-  const supabase = getSupabase();
-  let query = supabase
-    .from("projects")
-    .select("id, code, name, metadata")
-    .order("name", { ascending: true });
+  return withSupabaseRetry(async () => {
+    const supabase = getSupabase();
+    let query = supabase
+      .from("projects")
+      .select("id, code, name, metadata")
+      .order("name", { ascending: true });
 
-  if (projectIds && projectIds.length > 0) {
-    query = query.in("id", projectIds);
-  }
+    if (projectIds && projectIds.length > 0) {
+      query = query.in("id", projectIds);
+    }
 
-  const { data, error } = await query;
+    const { data, error } = await query;
 
-  if (error) {
-    throw error;
-  }
+    if (error) {
+      throw error;
+    }
 
-  return (data ?? []) as ImportedEnergyProjectRow[];
+    return (data ?? []) as ImportedEnergyProjectRow[];
+  });
 };
 
 const toImportedEnergyProject = (
@@ -931,19 +978,21 @@ const toImportedEnergyProject = (
 });
 
 const loadEnergyQueryProjectRows = async () => {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("energy_query_projects")
-    .select(
-      "project_id, project_code, project_name, org_id, organization_path, record_count, first_sample_date, last_sample_date",
-    )
-    .order("project_name", { ascending: true });
+  return withSupabaseRetry(async () => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("energy_query_projects")
+      .select(
+        "project_id, project_code, project_name, org_id, organization_path, record_count, first_sample_date, last_sample_date",
+      )
+      .order("project_name", { ascending: true });
 
-  if (error) {
-    throw error;
-  }
+    if (error) {
+      throw error;
+    }
 
-  return (data ?? []) as EnergyQueryProjectViewRow[];
+    return (data ?? []) as EnergyQueryProjectViewRow[];
+  });
 };
 
 const toEnergyQueryOption = (
@@ -1115,7 +1164,7 @@ export const queryImportedEnergyReport = async (
           query = query.lte("sample_date", endDate);
         }
 
-        const { data, error } = await query;
+        const { data, error } = await withSupabaseRetry(async () => query);
 
         if (error) {
           throw error;
@@ -1301,86 +1350,94 @@ export const createReport = async (input: ReportInput) => {
 };
 
 export const listChatSessions = async () => {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("chat_sessions")
-    .select(
-      "id, title, summary, status, metadata, last_message_at, created_at, updated_at",
-    )
-    .order("last_message_at", { ascending: false });
+  return withSupabaseRetry(async () => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .select(
+        "id, title, summary, status, metadata, last_message_at, created_at, updated_at",
+      )
+      .order("last_message_at", { ascending: false });
 
-  if (error) {
-    throw error;
-  }
+    if (error) {
+      throw error;
+    }
 
-  return ((data ?? []) as ChatSessionRow[]).map((row) =>
-    toChatSessionSummary(normalizeChatSession(row)),
-  );
+    return ((data ?? []) as ChatSessionRow[]).map((row) =>
+      toChatSessionSummary(normalizeChatSession(row)),
+    );
+  });
 };
 
 export const getChatSession = async (sessionId: string) => {
-  const supabase = getSupabase();
-  const { data, error } = await supabase
-    .from("chat_sessions")
-    .select(
-      "id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at",
-    )
-    .eq("id", sessionId)
-    .maybeSingle();
+  return withSupabaseRetry(async () => {
+    const supabase = getSupabase();
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .select(
+        "id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at",
+      )
+      .eq("id", sessionId)
+      .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
+    if (error) {
+      throw error;
+    }
 
-  if (!data) {
-    throw new Error("Chat session not found.");
-  }
+    if (!data) {
+      throw new Error("Chat session not found.");
+    }
 
-  return normalizeChatSession(data as ChatSessionRow);
+    return normalizeChatSession(data as ChatSessionRow);
+  });
 };
 
 export const createChatSession = async (input: ChatSessionInput) => {
-  const supabase = getSupabase();
-  const payload = buildChatSessionPayload(input);
+  return withSupabaseRetry(async () => {
+    const supabase = getSupabase();
+    const payload = buildChatSessionPayload(input);
 
-  const { data, error } = await supabase
-    .from("chat_sessions")
-    .insert(payload)
-    .select(
-      "id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at",
-    )
-    .single();
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .insert(payload)
+      .select(
+        "id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at",
+      )
+      .single();
 
-  if (error) {
-    throw error;
-  }
+    if (error) {
+      throw error;
+    }
 
-  return normalizeChatSession(data as ChatSessionRow);
+    return normalizeChatSession(data as ChatSessionRow);
+  });
 };
 
 export const updateChatSession = async (
   sessionId: string,
   input: ChatSessionInput,
 ) => {
-  const supabase = getSupabase();
-  const payload = buildChatSessionPayload(input);
+  return withSupabaseRetry(async () => {
+    const supabase = getSupabase();
+    const payload = buildChatSessionPayload(input);
 
-  const { data, error } = await supabase
-    .from("chat_sessions")
-    .update(payload)
-    .eq("id", sessionId)
-    .select(
-      "id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at",
-    )
-    .maybeSingle();
+    const { data, error } = await supabase
+      .from("chat_sessions")
+      .update(payload)
+      .eq("id", sessionId)
+      .select(
+        "id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at",
+      )
+      .maybeSingle();
 
-  if (error) {
-    throw error;
-  }
+    if (error) {
+      throw error;
+    }
 
-  if (!data) {
-    throw new Error("Chat session not found.");
-  }
+    if (!data) {
+      throw new Error("Chat session not found.");
+    }
 
-  return normalizeChatSession(data as ChatSessionRow);
+    return normalizeChatSession(data as ChatSessionRow);
+  });
 };

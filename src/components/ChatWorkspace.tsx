@@ -245,6 +245,58 @@ const getQueryConfigErrorMessage = (error: unknown) => {
   return message || "查询配置加载失败。";
 };
 
+const sleep = (ms: number) =>
+  new Promise((resolve) => {
+    window.setTimeout(resolve, ms);
+  });
+
+const isAbortError = (error: unknown) =>
+  (error instanceof DOMException && error.name === "AbortError") ||
+  (error instanceof Error && error.name === "AbortError");
+
+const isRetryableRequestError = (error: unknown) => {
+  if (!(error instanceof Error) || isAbortError(error)) {
+    return false;
+  }
+
+  const message = error.message.toLowerCase();
+
+  return (
+    message.includes("fetch") ||
+    message.includes("network") ||
+    message.includes("timeout") ||
+    message.includes("request failed: 500") ||
+    message.includes("request failed: 502") ||
+    message.includes("request failed: 503") ||
+    message.includes("request failed: 504")
+  );
+};
+
+const retryRequest = async <T,>(
+  operation: () => Promise<T>,
+  attempts = 3,
+): Promise<T> => {
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= attempts; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+
+      if (attempt >= attempts || !isRetryableRequestError(error)) {
+        throw error;
+      }
+
+      await sleep(250 * attempt);
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Request failed after retries.");
+};
+
 const createChatMessage = ({
   content,
   role,
@@ -388,6 +440,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const [isSessionSaving, setIsSessionSaving] = useState(false);
   const [sessionSaveError, setSessionSaveError] = useState("");
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
+  const [aiStatusMessage, setAiStatusMessage] = useState("");
 
   const activeRequestRef = useRef<AbortController | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
@@ -560,8 +613,9 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       setProjectLoadError("");
 
       try {
-        const response = await api.getEnergyQueryConfig(
-          requestController.signal,
+        const response = await retryRequest<EnergyQueryConfig>(
+          () => api.getEnergyQueryConfig(requestController.signal),
+          4,
         );
 
         if (!isMounted) {
@@ -591,7 +645,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           resetDates: false,
         });
       } catch (error) {
-        if (!isMounted) {
+        if (!isMounted || isAbortError(error)) {
           return;
         }
 
@@ -621,7 +675,10 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       setHistoryError("");
 
       try {
-        const sessions = await sessionStoreRef.current.list();
+        const sessions = await retryRequest<ChatSessionSummary[]>(
+          () => sessionStoreRef.current.list(),
+          3,
+        );
 
         if (!isMounted) {
           return;
@@ -629,7 +686,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
         setHistorySessions(sortHistorySessions(sessions));
       } catch (error) {
-        if (!isMounted) {
+        if (!isMounted || isAbortError(error)) {
           return;
         }
 
@@ -663,10 +720,18 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       historySessions.find((session) => session.id === activeSessionId) ?? null,
     [activeSessionId, historySessions],
   );
-  const statusTone = sessionSaveError ? "text-rose-500" : textSecondary;
+  const statusTone = sessionSaveError
+    ? "text-rose-500"
+    : aiStatusMessage
+      ? "text-amber-500"
+      : textSecondary;
   const conversationStatus = useMemo(() => {
     if (sessionSaveError) {
       return sessionSaveError;
+    }
+
+    if (aiStatusMessage) {
+      return aiStatusMessage;
     }
 
     if (isSessionSaving) {
@@ -692,6 +757,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     return "当前会话内容会自动保存到数据库历史会话。";
   }, [
     activeHistorySession,
+    aiStatusMessage,
     chatMessages.length,
     isSessionSaving,
     isThinking,
@@ -799,6 +865,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
   const handleCreateNewSession = async () => {
     cancelActiveRun();
+    let saveFailed = false;
 
     if (chatMessages.length > 0) {
       const savedSession = await persistConversation(
@@ -807,7 +874,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       );
 
       if (!savedSession) {
-        return;
+        saveFailed = true;
       }
     }
 
@@ -815,9 +882,12 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     setChatMessages([]);
     setInput("");
     setSelectedIntent(defaultQuickIntent);
-    setSessionSaveError("");
+    setSessionSaveError(
+      saveFailed ? "上一段会话保存失败，但已为你打开新会话。" : "",
+    );
     setLastSavedAt(null);
     setLoadingSessionId(null);
+    setAiStatusMessage("");
     composerRef.current?.focus();
   };
 
@@ -845,6 +915,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     setInput("");
     setIsThinking(true);
     setSessionSaveError("");
+    setAiStatusMessage("");
 
     const savedSessionAfterUserMessage = await persistConversation(
       nextMessages,
@@ -913,6 +984,12 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
         return;
       }
 
+      setAiStatusMessage(
+        response.usedFallback
+          ? "当前未调用真实 AI 模型，后端缺少 GEMINI_API_KEY，现已回退为本地占位回复。"
+          : "",
+      );
+
       const assistantMessage = createChatMessage({
         content: response.reply,
         role: "assistant",
@@ -976,9 +1053,13 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     setLoadingSessionId(sessionId);
     setHistoryError("");
     setSessionSaveError("");
+    setAiStatusMessage("");
 
     try {
-      const session = await sessionStoreRef.current.get(sessionId);
+      const session = await retryRequest<ChatSession>(
+        () => sessionStoreRef.current.get(sessionId),
+        3,
+      );
       const context = readContextFromSession(session);
       const preferredProjectId = normalizeString(context?.projectId);
       const preferredOrgId = normalizeString(context?.orgId);

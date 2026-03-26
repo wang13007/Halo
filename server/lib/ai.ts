@@ -46,6 +46,14 @@ const aiClient = env.googleApiKey
   ? new GoogleGenAI({ apiKey: env.googleApiKey })
   : null;
 
+export const isAiModelConfigured = () => Boolean(aiClient);
+
+export const getAiRuntimeStatus = () => ({
+  configured: isAiModelConfigured(),
+  model: defaultModel,
+  provider: 'gemini' as const,
+});
+
 const sanitizeString = (value: unknown, fallback: string) =>
   typeof value === 'string' && value.trim() ? value.trim() : fallback;
 
@@ -335,6 +343,13 @@ export const generateHaloChatReply = async (
   const fallback = buildFallbackChat(input);
   const reportPromptContext = buildReportTemplatePromptContext(input);
 
+  if (!aiClient) {
+    return {
+      ...fallback,
+      thinking: `${fallback.thinking}\nAI model is not configured on the server. Set GEMINI_API_KEY to enable Gemini replies.`,
+    };
+  }
+
   try {
     const parsed = await generateJson(buildChatSystemInstruction(input), {
       ...input,
@@ -393,6 +408,13 @@ export const generateHaloArtifact = async (
   input: HaloArtifactInput,
 ): Promise<HaloArtifactOutput> => {
   const fallback = buildFallbackArtifact(input);
+
+  if (!aiClient) {
+    return {
+      ...fallback,
+      summary: `${fallback.summary} AI model is not configured on the server.`,
+    };
+  }
 
   try {
     const parsed = await generateJson(
