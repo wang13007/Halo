@@ -18,6 +18,7 @@ import {
   type EnergyQueryConfig,
   type EnergyQueryOption,
   type EnergyQuickProject,
+  type Project,
   type UpsertChatSessionPayload,
 } from "../lib/api";
 import {
@@ -404,6 +405,87 @@ const findProjectOption = (
       project.projectId === selectionValue || project.orgId === selectionValue,
   ) ?? null;
 
+const defaultEnergyTypeValues = Object.keys(energyTypeLabels);
+const defaultIntervalValues = Object.keys(intervalLabels);
+
+const toFallbackQueryOptions = (
+  values: string[],
+  labelMap: Record<string, string>,
+): EnergyQueryOption[] =>
+  values.map((value) => ({
+    label: labelMap[value] ?? value,
+    value,
+  }));
+
+const normalizeDatabaseProjects = (projects: Project[]) =>
+  normalizeQuickProjects(
+    projects.map((project) => ({
+      availableGranularities: defaultIntervalValues,
+      availableMeterTypes: defaultEnergyTypeValues,
+      channel: "DATABASE",
+      name: project.name,
+      orgId: project.code,
+      projectCode: project.code,
+      projectId: project.id,
+      projectName: project.name,
+    })),
+  );
+
+const buildFallbackQueryConfig = (
+  projects: EnergyQuickProject[],
+): EnergyQueryConfig => {
+  const defaultProject = projects[0];
+  const energyTypes = [
+    ...new Set(
+      projects.flatMap((project) =>
+        project.availableMeterTypes?.length
+          ? project.availableMeterTypes
+          : defaultEnergyTypeValues,
+      ),
+    ),
+  ];
+  const intervals = [
+    ...new Set(
+      projects.flatMap((project) =>
+        project.availableGranularities?.length
+          ? project.availableGranularities
+          : defaultIntervalValues,
+      ),
+    ),
+  ];
+  const defaultDate =
+    defaultProject?.lastSampleDate || defaultProject?.firstSampleDate || "";
+
+  return {
+    defaults: {
+      endDate: defaultDate,
+      energyType: energyTypes[0] ?? "electricity",
+      interval: intervals[0] ?? "day",
+      orgId: defaultProject?.orgId ?? "",
+      pageNum: 1,
+      pageSize: 20,
+      project: defaultProject?.name ?? "",
+      projectId: defaultProject?.projectId ?? "",
+      startDate: defaultDate,
+    },
+    energyTypes: toFallbackQueryOptions(energyTypes, energyTypeLabels),
+    intervals: toFallbackQueryOptions(intervals, intervalLabels),
+    projects,
+  };
+};
+
+const quickIntentDraftMap: Record<QuickIntentId, (projectName: string) => string> =
+  {
+    "energy-compare": (projectName) =>
+      `请对比 ${projectName} 最近一天的能耗表现，并指出主要变化。`,
+    "energy-diagnostic": (projectName) =>
+      `请诊断 ${projectName} 最近一天是否存在异常用能。`,
+    "energy-query": (projectName) =>
+      `请查询 ${projectName} 最近一天的能耗数据。`,
+    "energy-report": (projectName) =>
+      `请生成 ${projectName} 最近一天的能耗简报。`,
+  };
+
 export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const [chatForm, setChatForm] = useState<ChatQueryForm>({
     endDate: "",
@@ -613,35 +695,79 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       setProjectLoadError("");
 
       try {
-        const response = await retryRequest<EnergyQueryConfig>(
-          () => api.getEnergyQueryConfig(requestController.signal),
-          4,
-        );
+        let nextConfig: EnergyQueryConfig | null = null;
+        let lastError: unknown = null;
+
+        try {
+          const response = await retryRequest<EnergyQueryConfig>(
+            () => api.getEnergyQueryConfig(requestController.signal),
+            4,
+          );
+          const normalizedProjects = normalizeQuickProjects(response.projects);
+
+          if (normalizedProjects.length > 0) {
+            nextConfig = {
+              ...response,
+              projects: normalizedProjects,
+            };
+          } else {
+            lastError = new Error("No energy query projects were returned.");
+          }
+        } catch (error) {
+          lastError = error;
+        }
+
+        if (!nextConfig) {
+          try {
+            const response = await retryRequest(
+              () => api.getEnergyQuickProjects(requestController.signal),
+              3,
+            );
+            const normalizedProjects = normalizeQuickProjects(response.projects);
+
+            if (normalizedProjects.length > 0) {
+              nextConfig = buildFallbackQueryConfig(normalizedProjects);
+            }
+          } catch (error) {
+            lastError = error;
+          }
+        }
+
+        if (!nextConfig) {
+          const response = await retryRequest(() => api.getProjects(), 3);
+          const normalizedProjects = normalizeDatabaseProjects(
+            response.projects,
+          );
+
+          if (normalizedProjects.length === 0) {
+            throw lastError instanceof Error
+              ? lastError
+              : new Error("No database projects are available.");
+          }
+
+          nextConfig = buildFallbackQueryConfig(normalizedProjects);
+        }
 
         if (!isMounted) {
           return;
         }
 
-        const normalizedProjects = normalizeQuickProjects(response.projects);
-        const normalizedConfig: EnergyQueryConfig = {
-          ...response,
-          projects: normalizedProjects,
-        };
+        const normalizedProjects = nextConfig.projects;
         const matchedProject =
           findProjectOption(
             normalizedProjects,
-            response.defaults.projectId || response.defaults.orgId,
+            nextConfig.defaults.projectId || nextConfig.defaults.orgId,
           ) ??
           normalizedProjects[0] ??
           null;
 
-        setQueryConfig(normalizedConfig);
+        setQueryConfig(nextConfig);
         setProjectOptions(normalizedProjects);
-        applyProjectSelection(matchedProject, normalizedConfig, {
-          preferredEnergyType: response.defaults.energyType,
-          preferredEndDate: response.defaults.endDate,
-          preferredInterval: response.defaults.interval,
-          preferredStartDate: response.defaults.startDate,
+        applyProjectSelection(matchedProject, nextConfig, {
+          preferredEnergyType: nextConfig.defaults.energyType,
+          preferredEndDate: nextConfig.defaults.endDate,
+          preferredInterval: nextConfig.defaults.interval,
+          preferredStartDate: nextConfig.defaults.startDate,
           resetDates: false,
         });
       } catch (error) {
@@ -715,6 +841,23 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     : "border-white/80 bg-white/84";
   const mutedSurface = isDarkMode ? "bg-white/5" : "bg-slate-50";
   const promptProjectName = selectedProject?.name || chatForm.project || "项目";
+  const buildSessionMetadata = () => ({
+    context: {
+      endDate: chatForm.endDate,
+      energyType: selectedEnergyTypeLabel,
+      energyTypeValue: chatForm.energyType,
+      interval: selectedIntervalLabel,
+      intervalValue: chatForm.interval,
+      orgId: chatForm.orgId,
+      project: chatForm.project,
+      projectId: chatForm.projectId,
+      queryName: chatForm.queryName,
+      startDate: chatForm.startDate,
+      timeRange: selectedTimeRangeLabel,
+    },
+    source: "chat-workspace",
+  });
+
   const activeHistorySession = useMemo(
     () =>
       historySessions.find((session) => session.id === activeSessionId) ?? null,
@@ -780,6 +923,22 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     applyProjectSelection(matchedProject, queryConfig, { resetDates: true });
   };
 
+  const handleQuickIntentSelect = (intentId: QuickIntentId) => {
+    setSelectedIntent(intentId);
+    setInput((previous) =>
+      previous.trim()
+        ? previous
+        : quickIntentDraftMap[intentId](promptProjectName),
+    );
+    composerRef.current?.focus();
+  };
+
+  const handleQuickIntentReset = () => {
+    setSelectedIntent(defaultQuickIntent);
+    setInput("");
+    composerRef.current?.focus();
+  };
+
   const handleStartDateChange = (value: string) => {
     const minDate = selectedProject?.firstSampleDate ?? "";
     const maxDate = selectedProject?.lastSampleDate ?? "";
@@ -815,8 +974,13 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const persistConversation = async (
     messages: ChatMessage[],
     sessionId = activeSessionIdRef.current,
+    options?: {
+      allowEmpty?: boolean;
+      summary?: string;
+      title?: string;
+    },
   ) => {
-    if (messages.length === 0) {
+    if (messages.length === 0 && !options?.allowEmpty) {
       return null;
     }
 
@@ -826,22 +990,9 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     try {
       const payload: UpsertChatSessionPayload = {
         messages: mapViewMessagesToSession(messages),
-        metadata: {
-          context: {
-            endDate: chatForm.endDate,
-            energyType: selectedEnergyTypeLabel,
-            energyTypeValue: chatForm.energyType,
-            interval: selectedIntervalLabel,
-            intervalValue: chatForm.interval,
-            orgId: chatForm.orgId,
-            project: chatForm.project,
-            projectId: chatForm.projectId,
-            queryName: chatForm.queryName,
-            startDate: chatForm.startDate,
-            timeRange: selectedTimeRangeLabel,
-          },
-          source: "chat-workspace",
-        },
+        metadata: buildSessionMetadata(),
+        ...(options?.summary !== undefined ? { summary: options.summary } : {}),
+        ...(options?.title ? { title: options.title } : {}),
       };
 
       const session = sessionId
@@ -885,9 +1036,20 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     setSessionSaveError(
       saveFailed ? "上一段会话保存失败，但已为你打开新会话。" : "",
     );
+    setHistoryError("");
     setLastSavedAt(null);
     setLoadingSessionId(null);
     setAiStatusMessage("");
+    const nextSession = await persistConversation([], null, {
+      allowEmpty: true,
+      summary: "",
+      title: "新建会话",
+    });
+
+    if (!nextSession && !saveFailed) {
+      setSessionSaveError("新会话创建失败，请稍后重试。");
+    }
+
     composerRef.current?.focus();
   };
 
@@ -1250,6 +1412,33 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
                 </div>
 
                   */}
+                  <div className="flex flex-wrap gap-2">
+                    {quickIntents.map((intent) => {
+                      const isActive = intent.id === selectedIntent;
+
+                      return (
+                        <button
+                          key={intent.id}
+                          type="button"
+                          onClick={() => handleQuickIntentSelect(intent.id)}
+                          className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                            isActive
+                              ? "border-sky-500/45 bg-sky-500/12 text-sky-700 dark:text-sky-300"
+                              : `${cardSurface} ${textPrimary}`
+                          }`}
+                        >
+                          {intent.label}
+                        </button>
+                      );
+                    })}
+                    <button
+                      type="button"
+                      onClick={handleQuickIntentReset}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${cardSurface} ${textPrimary}`}
+                    >
+                      娓呴櫎
+                    </button>
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     <span
                       className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
