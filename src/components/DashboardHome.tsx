@@ -66,12 +66,12 @@ type WidgetBodyProps = {
 const sizeButtonOptions: WidgetSize[] = ['1:1', '2:1', '2:2'];
 
 const dashboardGridClassName =
-  'grid grid-cols-1 gap-5 md:grid-flow-row-dense md:auto-rows-[212px] md:grid-cols-6 xl:auto-rows-[220px] xl:grid-cols-12';
+  'grid grid-cols-1 gap-5 md:grid-flow-row-dense md:auto-rows-[minmax(168px,_auto)] md:grid-cols-6 xl:auto-rows-[minmax(176px,_auto)] xl:grid-cols-12';
 
 const widgetMobileHeightClassMap: Record<WidgetSize, string> = {
-  '1:1': 'min-h-[300px]',
-  '2:1': 'min-h-[330px]',
-  '2:2': 'min-h-[520px]',
+  '1:1': 'min-h-[340px] md:min-h-0',
+  '2:1': 'min-h-[380px] md:min-h-0',
+  '2:2': 'min-h-[720px] md:min-h-0',
 };
 
 const sizeDescriptionMap: Record<WidgetSize, string> = {
@@ -248,7 +248,7 @@ const WidgetHeader = ({
         <Icon size={18} />
       </span>
       <div className="min-w-0">
-        <div className={`dashboard-title truncate ${theme.textPrimary}`}>{title}</div>
+        <div className={`dashboard-title break-words ${theme.textPrimary}`}>{title}</div>
         {subtitle ? <div className={`dashboard-meta mt-1 ${theme.textMuted}`}>{subtitle}</div> : null}
       </div>
     </div>
@@ -330,7 +330,7 @@ const ChartTooltip = ({
 };
 
 const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-5">
+  <div className="flex h-full flex-col gap-4">
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
       <div className="min-w-0">
         <WidgetHeader icon={Bolt} subtitle="集团今日总览" theme={theme} title={widget.title} />
@@ -343,7 +343,7 @@ const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
     </div>
 
     <div className="grid flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
-      <div className="flex min-h-0 flex-col justify-between">
+      <div className="flex min-h-0 flex-1 flex-col gap-5">
         <div>
           <div className={`dashboard-kicker ${theme.textMuted}`}>今日累计电量</div>
           <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -383,9 +383,9 @@ const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
 );
 
 const PowerCompositionCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-5">
+  <div className="flex h-full flex-col gap-4">
     <WidgetHeader icon={BarChart3} subtitle="实时结构占比" theme={theme} title={widget.title} />
-    <div className="flex flex-1 flex-col justify-between gap-5">
+    <div className="flex flex-1 flex-col gap-4">
       <DonutGauge isDarkMode={isDarkMode} label="租户用电占比" percentage={60} />
       <div className="space-y-3">
         {powerCompositionData.map((item) => (
@@ -403,7 +403,7 @@ const PowerCompositionCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) =>
 );
 
 const SolarPowerCard = ({ theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-5">
+  <div className="flex h-full flex-col gap-4">
     <WidgetHeader
       icon={SunMedium}
       status={<DashboardPill className="bg-cyan-50 text-cyan-700">运行中</DashboardPill>}
@@ -411,7 +411,7 @@ const SolarPowerCard = ({ theme, widget }: WidgetBodyProps) => (
       theme={theme}
       title={widget.title}
     />
-    <div className="flex flex-1 flex-col justify-between gap-5">
+    <div className="flex flex-1 flex-col gap-4">
       <div>
         <div className={`dashboard-kicker ${theme.textMuted}`}>实时功率</div>
         <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -434,9 +434,9 @@ const SolarPowerCard = ({ theme, widget }: WidgetBodyProps) => (
 );
 
 const SystemRankingCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-5">
+  <div className="flex h-full flex-col gap-4">
     <WidgetHeader icon={ListTodo} subtitle="按系统维度" theme={theme} title={widget.title} />
-    <div className="flex flex-1 flex-col justify-between gap-4">
+    <div className="flex flex-1 flex-col gap-4">
       {systemRankingData.map((item, index) => (
         <div key={item.label}>
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -448,7 +448,7 @@ const SystemRankingCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
               >
                 {index + 1}
               </span>
-              <span className={`truncate text-sm font-medium ${theme.textSecondary}`}>{item.label}</span>
+              <span className={`text-sm font-medium ${theme.textSecondary}`}>{item.label}</span>
             </div>
             <span className={`text-sm font-semibold ${theme.textPrimary}`}>{item.value}%</span>
           </div>
@@ -492,7 +492,7 @@ const MultiEnergyCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
         </div>
       </div>
 
-      <div className="dashboard-chart mt-4 h-[240px] flex-1">
+      <div className="dashboard-chart mt-4 min-h-[260px] flex-1">
         <ResponsiveContainer width="100%" height="100%">
           <AreaChart data={multiEnergySeries} margin={{ bottom: 0, left: -12, right: 4, top: 8 }}>
             <defs>
@@ -524,9 +524,9 @@ const MultiEnergyCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
 );
 
 const CarbonMonitorCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-5">
+  <div className="flex h-full flex-col gap-4">
     <WidgetHeader icon={Leaf} subtitle="双碳监测" theme={theme} title={widget.title} />
-    <div className="flex flex-1 flex-col justify-between gap-5">
+    <div className="flex flex-1 flex-col gap-4">
       <div>
         <div className={`dashboard-kicker ${theme.textMuted}`}>今日碳减排量</div>
         <div className="mt-3 flex flex-wrap items-end gap-2">
@@ -561,7 +561,7 @@ const ForecastCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
     <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_260px]">
       <div className={`flex min-h-0 flex-col rounded-[var(--dashboard-radius-panel)] border p-4 ${theme.panelSurface}`}>
         <div className={`dashboard-meta ${theme.textMuted}`}>预测负荷曲线</div>
-        <div className="dashboard-chart mt-4 h-[180px] flex-1">
+        <div className="dashboard-chart mt-4 min-h-[220px] flex-1">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={forecastSeries} margin={{ bottom: 0, left: -12, right: 4, top: 8 }}>
               <defs>
@@ -620,9 +620,9 @@ const StorageCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
 );
 
 const AlertClosureCard = ({ theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-5">
+  <div className="flex h-full flex-col gap-4">
     <WidgetHeader icon={AlertTriangle} subtitle="处理闭环" theme={theme} title={widget.title} />
-    <div className="flex flex-1 flex-col justify-between gap-5">
+    <div className="flex flex-1 flex-col gap-4">
       <div>
         <div className={`dashboard-kicker ${theme.textMuted}`}>5 分钟响应率</div>
         <div className={`mt-3 dashboard-value-md ${theme.textPrimary}`}>87%</div>
@@ -640,9 +640,9 @@ const AlertClosureCard = ({ theme, widget }: WidgetBodyProps) => (
 );
 
 const SavingsPoolCard = ({ theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-5">
+  <div className="flex h-full flex-col gap-4">
     <WidgetHeader icon={Sparkles} subtitle="节能机会池" theme={theme} title={widget.title} />
-    <div className="flex flex-1 flex-col justify-between gap-5">
+    <div className="flex flex-1 flex-col gap-4">
       <div>
         <div className={`dashboard-kicker ${theme.textMuted}`}>预计月度收益</div>
         <div className={`mt-3 dashboard-value-md ${theme.textPrimary}`}>¥12.6 万</div>
@@ -662,7 +662,7 @@ const SavingsPoolCard = ({ theme, widget }: WidgetBodyProps) => (
 const GenericInsightCard = ({ theme, widget }: WidgetBodyProps) => {
   const Icon = getWidgetIcon(widget);
   return (
-    <div className="flex h-full flex-col gap-5">
+    <div className="flex h-full flex-col gap-4">
       <WidgetHeader
         icon={Icon}
         status={<DashboardPill className={widget.category === 'custom' ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-700'}>{widget.category === 'custom' ? 'AI 定制' : '系统卡片'}</DashboardPill>}
@@ -672,7 +672,7 @@ const GenericInsightCard = ({ theme, widget }: WidgetBodyProps) => {
       />
       <div className={`dashboard-value-md ${theme.textPrimary}`}>{widget.value}</div>
       <div className={`text-sm leading-6 ${theme.textSecondary}`}>{widget.helper}</div>
-      <div className="mt-auto space-y-3">
+      <div className="space-y-3 pt-2">
         {widget.items.slice(0, widget.size === '1:1' ? 3 : 4).map((item) => (
           <div key={item} className={`flex items-start gap-3 rounded-[18px] border px-3.5 py-3 ${theme.chipSurface}`}>
             <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cyan-500" />
@@ -729,13 +729,13 @@ const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
   const theme = getDashboardTheme(isDarkMode);
   return (
     <article
-      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[var(--dashboard-radius-card)] border transition duration-300 md:h-full md:min-h-0 ${
+      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[var(--dashboard-radius-card)] border transition duration-300 md:min-h-0 ${
         mode === 'board' ? 'hover:-translate-y-0.5' : ''
       } ${highlight ? 'ring-2 ring-cyan-400/55' : ''} ${theme.cardSurface}`}
     >
       <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${widget.accent}`} />
       {mode === 'preview' ? <WidgetToolbar isDarkMode={isDarkMode} onRemove={onRemove} /> : null}
-      <div className={`relative flex h-full min-h-0 flex-col p-[var(--dashboard-card-padding)] ${mode === 'preview' ? 'pr-[88px]' : ''}`}>
+      <div className={`relative flex min-h-full flex-col p-[var(--dashboard-card-padding)] ${mode === 'preview' ? 'pr-[88px]' : ''}`}>
         {renderWidgetBody({ isDarkMode, theme, widget })}
       </div>
     </article>

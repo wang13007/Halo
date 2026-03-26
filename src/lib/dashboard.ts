@@ -31,9 +31,9 @@ export const widgetSizeLabelMap: Record<WidgetSize, string> = {
 };
 
 export const widgetSizeClassMap: Record<WidgetSize, string> = {
-  '1:1': 'md:col-span-3 xl:col-span-3',
-  '2:1': 'md:col-span-6 xl:col-span-6',
-  '2:2': 'md:col-span-6 md:row-span-2 xl:col-span-6 xl:row-span-2',
+  '1:1': 'md:col-span-3 md:row-span-2 xl:col-span-3 xl:row-span-2',
+  '2:1': 'md:col-span-6 md:row-span-2 xl:col-span-6 xl:row-span-2',
+  '2:2': 'md:col-span-6 md:row-span-4 xl:col-span-6 xl:row-span-4',
 };
 
 export const createLocalId = (prefix: string) =>
