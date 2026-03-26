@@ -10,10 +10,12 @@ import {
   createReport,
   getChatSession,
   getEnergyAnalysis,
+  listImportedEnergyProjects,
   listChatSessions,
   listIntegrations,
   listProjects,
   listReports,
+  queryImportedEnergyReport,
   updateChatSession,
 } from './services/halo-service.js';
 
@@ -419,6 +421,28 @@ app.post('/api/ai/coding', async (request, response, next) => {
 });
 
 app.get('/api/energy/quick-projects', async (_request, response) => {
+  try {
+    const importedProjects = await listImportedEnergyProjects();
+
+    if (importedProjects.length > 0) {
+      response.json({
+        projects: importedProjects.map((project) => ({
+          channel: 'LOCAL',
+          name: project.projectName,
+          orgId: project.orgId,
+        })),
+        upstreamStatus: 200,
+        upstreamUrl: 'supabase://public.energy_query_projects',
+      });
+      return;
+    }
+  } catch (error) {
+    console.warn(
+      'Failed to load local energy query projects:',
+      error instanceof Error ? error.message : error,
+    );
+  }
+
   const longforConfig = buildLongforHeaders();
 
   if (!hasLongforCredentials(longforConfig)) {
@@ -483,6 +507,83 @@ app.get('/api/energy/quick-projects', async (_request, response) => {
 });
 
 app.post('/api/energy/query-report', async (request, response) => {
+  const payload = (request.body?.payload ?? request.body ?? {}) as Record<string, unknown>;
+
+  try {
+    const importedProjects = await listImportedEnergyProjects();
+
+    if (importedProjects.length > 0) {
+      const report = await queryImportedEnergyReport(payload);
+      const message =
+        report.summary.requestedGranularity === 'hour'
+          ? 'Imported Excel data currently contains daily readings only. Returned daily Supabase records.'
+          : 'Returned local Supabase energy records.';
+
+      response.json({
+        ok: true,
+        upstreamStatus: 200,
+        upstreamUrl: 'supabase://public.energy_query_records',
+        requestPayload: payload,
+        message,
+        data: report,
+      });
+      return;
+    }
+  } catch (error) {
+    response.status(500).json({
+      ok: false,
+      upstreamStatus: 500,
+      upstreamUrl: 'supabase://public.energy_query_records',
+      requestPayload: payload,
+      message: error instanceof Error ? error.message : 'Failed to query Supabase energy records.',
+    });
+    return;
+  }
+
+  const longforConfig = buildLongforHeaders();
+
+  if (!hasLongforCredentials(longforConfig)) {
+    response.status(500).json({
+      ok: false,
+      upstreamStatus: 500,
+      upstreamUrl: env.longforQueryReportUrl,
+      requestPayload: payload,
+      message:
+        'Missing Longfor credentials. Configure LONGFOR_AUTHORIZATION and LONGFOR_X_GAIA_API_KEY, or configure LONGFOR_CASTGC.',
+    });
+    return;
+  }
+
+  try {
+    const upstreamResponse = await fetch(env.longforQueryReportUrl, {
+      method: 'POST',
+      headers: {
+        ...longforConfig.headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(payload),
+    });
+    const data = await parseUpstreamResponse(upstreamResponse);
+
+    response.status(upstreamResponse.status).json({
+      ok: upstreamResponse.ok,
+      upstreamStatus: upstreamResponse.status,
+      upstreamUrl: env.longforQueryReportUrl,
+      requestPayload: payload,
+      data,
+    });
+  } catch (error) {
+    response.status(502).json({
+      ok: false,
+      upstreamStatus: 502,
+      upstreamUrl: env.longforQueryReportUrl,
+      requestPayload: payload,
+      message: error instanceof Error ? error.message : 'Failed to proxy queryReport.',
+    });
+  }
+});
+
+app.post('/api/energy/query-report-legacy', async (request, response) => {
   const longforConfig = buildLongforHeaders();
   const payload = (request.body?.payload ?? request.body ?? {}) as Record<string, unknown>;
 

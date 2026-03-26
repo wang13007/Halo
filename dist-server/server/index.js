@@ -3,7 +3,7 @@ import express from 'express';
 import { env, isSupabaseConfigured, resolveCorsOrigin } from './config.js';
 import { generateHaloArtifact, generateHaloChatReply } from './lib/ai.js';
 import { getSupabase } from './lib/supabase.js';
-import { createEnergyMetric, createIntegration, createReport, getEnergyAnalysis, listIntegrations, listProjects, listReports, } from './services/halo-service.js';
+import { createChatSession, createEnergyMetric, createIntegration, createReport, getChatSession, getEnergyAnalysis, listImportedEnergyProjects, listChatSessions, listIntegrations, listProjects, listReports, queryImportedEnergyReport, updateChatSession, } from './services/halo-service.js';
 const app = express();
 const normalizeCastgc = (rawValue) => {
     const value = rawValue.trim();
@@ -101,11 +101,11 @@ const collectEnergyQuickProjects = (value, projects, seen, context = { channel: 
     const orgId = getFirstNonEmptyString(value, projectIdKeys);
     const isProjectPath = context.path.some((segment) => /org|project/i.test(segment));
     const hasProjectShape = isProjectPath || projectShapeKeys.some((key) => key in value);
-    if (channel === 'C2' && hasProjectShape && name && orgId) {
+    if (hasProjectShape && name && orgId) {
         const dedupeKey = `${orgId}::${name}`;
         if (!seen.has(dedupeKey)) {
             seen.add(dedupeKey);
-            projects.push({ channel, name, orgId });
+            projects.push({ channel: channel || 'UNKNOWN', name, orgId });
         }
     }
     Object.entries(value).forEach(([key, childValue]) => {
@@ -118,7 +118,10 @@ const collectEnergyQuickProjects = (value, projects, seen, context = { channel: 
 const extractEnergyQuickProjects = (payload) => {
     const projects = [];
     collectEnergyQuickProjects(payload, projects, new Set());
-    return projects.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
+    const preferredProjects = projects.some((project) => project.channel === 'C2')
+        ? projects.filter((project) => project.channel === 'C2')
+        : projects;
+    return preferredProjects.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
 };
 const getUpstreamBusinessError = (payload) => {
     if (!isPlainObject(payload)) {
@@ -131,6 +134,30 @@ const getUpstreamBusinessError = (payload) => {
     const message = getFirstNonEmptyString(payload, ['msg', 'message', 'error', 'errorMessage']);
     return message ? `${message} (code: ${code})` : `Upstream business error (code: ${code})`;
 };
+const describeUpstreamFetchError = (error, upstreamUrl) => {
+    const fallbackMessage = `Failed to fetch upstream service: ${upstreamUrl}`;
+    if (!(error instanceof Error)) {
+        return fallbackMessage;
+    }
+    const cause = isPlainObject(error.cause) ? error.cause : null;
+    const causeCode = cause ? getFirstNonEmptyString(cause, ['code']) : '';
+    const causeHost = cause ? getFirstNonEmptyString(cause, ['host']) : '';
+    const causePort = cause ? getFirstNonEmptyString(cause, ['port']) : '';
+    const causeMessage = cause ? getFirstNonEmptyString(cause, ['message']) : '';
+    const target = causeHost ? `${causeHost}${causePort ? `:${causePort}` : ''}` : upstreamUrl;
+    if (causeCode === 'ECONNRESET' ||
+        error.message.toLowerCase().includes('tls') ||
+        causeMessage.toLowerCase().includes('tls')) {
+        return `TLS handshake failed while connecting to ${target}. The current environment may need Longfor intranet or VPN access.`;
+    }
+    if (causeCode === 'ENOTFOUND') {
+        return `Cannot resolve upstream host for ${upstreamUrl}. Check LONGFOR_USER_INFO_URL.`;
+    }
+    if (causeCode === 'ETIMEDOUT') {
+        return `Connection timed out while reaching ${target}.`;
+    }
+    return causeCode ? `${error.message} (${causeCode})` : error.message || fallbackMessage;
+};
 app.use(cors({ origin: resolveCorsOrigin() }));
 app.use(express.json());
 app.get('/api', (_request, response) => {
@@ -139,6 +166,10 @@ app.get('/api', (_request, response) => {
         routes: [
             'GET /api/health',
             'GET /api/projects',
+            'GET /api/chat/sessions',
+            'GET /api/chat/sessions/:sessionId',
+            'POST /api/chat/sessions',
+            'PATCH /api/chat/sessions/:sessionId',
             'GET /api/energy/analysis',
             'GET /api/energy/quick-projects',
             'POST /api/energy/query-report',
@@ -207,6 +238,52 @@ app.get('/api/projects', async (_request, response, next) => {
         next(error);
     }
 });
+app.get('/api/chat/sessions', async (_request, response, next) => {
+    try {
+        const sessions = await listChatSessions();
+        response.json({ sessions });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+app.get('/api/chat/sessions/:sessionId', async (request, response, next) => {
+    try {
+        const session = await getChatSession(request.params.sessionId);
+        response.json({ session });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+app.post('/api/chat/sessions', async (request, response, next) => {
+    try {
+        const { messages } = request.body ?? {};
+        if (!Array.isArray(messages)) {
+            response.status(400).json({ error: 'messages must be an array to create a chat session.' });
+            return;
+        }
+        const session = await createChatSession(request.body);
+        response.status(201).json({ session });
+    }
+    catch (error) {
+        next(error);
+    }
+});
+app.patch('/api/chat/sessions/:sessionId', async (request, response, next) => {
+    try {
+        const { messages } = request.body ?? {};
+        if (!Array.isArray(messages)) {
+            response.status(400).json({ error: 'messages must be an array to update a chat session.' });
+            return;
+        }
+        const session = await updateChatSession(request.params.sessionId, request.body);
+        response.json({ session });
+    }
+    catch (error) {
+        next(error);
+    }
+});
 app.get('/api/energy/analysis', async (request, response, next) => {
     try {
         const projectCode = typeof request.query.projectCode === 'string'
@@ -250,6 +327,24 @@ app.post('/api/ai/coding', async (request, response, next) => {
     }
 });
 app.get('/api/energy/quick-projects', async (_request, response) => {
+    try {
+        const importedProjects = await listImportedEnergyProjects();
+        if (importedProjects.length > 0) {
+            response.json({
+                projects: importedProjects.map((project) => ({
+                    channel: 'LOCAL',
+                    name: project.projectName,
+                    orgId: project.orgId,
+                })),
+                upstreamStatus: 200,
+                upstreamUrl: 'supabase://public.energy_query_projects',
+            });
+            return;
+        }
+    }
+    catch (error) {
+        console.warn('Failed to load local energy query projects:', error instanceof Error ? error.message : error);
+    }
     const longforConfig = buildLongforHeaders();
     if (!hasLongforCredentials(longforConfig)) {
         response.status(500).json({
@@ -298,9 +393,7 @@ app.get('/api/energy/quick-projects', async (_request, response) => {
     }
     catch (error) {
         response.status(502).json({
-            error: error instanceof Error
-                ? error.message
-                : 'Failed to fetch Longfor quick-query projects.',
+            error: describeUpstreamFetchError(error, env.longforUserInfoUrl),
             projects: [],
             upstreamStatus: 502,
             upstreamUrl: env.longforUserInfoUrl,
@@ -308,6 +401,75 @@ app.get('/api/energy/quick-projects', async (_request, response) => {
     }
 });
 app.post('/api/energy/query-report', async (request, response) => {
+    const payload = (request.body?.payload ?? request.body ?? {});
+    try {
+        const importedProjects = await listImportedEnergyProjects();
+        if (importedProjects.length > 0) {
+            const report = await queryImportedEnergyReport(payload);
+            const message = report.summary.requestedGranularity === 'hour'
+                ? 'Imported Excel data currently contains daily readings only. Returned daily Supabase records.'
+                : 'Returned local Supabase energy records.';
+            response.json({
+                ok: true,
+                upstreamStatus: 200,
+                upstreamUrl: 'supabase://public.energy_query_records',
+                requestPayload: payload,
+                message,
+                data: report,
+            });
+            return;
+        }
+    }
+    catch (error) {
+        response.status(500).json({
+            ok: false,
+            upstreamStatus: 500,
+            upstreamUrl: 'supabase://public.energy_query_records',
+            requestPayload: payload,
+            message: error instanceof Error ? error.message : 'Failed to query Supabase energy records.',
+        });
+        return;
+    }
+    const longforConfig = buildLongforHeaders();
+    if (!hasLongforCredentials(longforConfig)) {
+        response.status(500).json({
+            ok: false,
+            upstreamStatus: 500,
+            upstreamUrl: env.longforQueryReportUrl,
+            requestPayload: payload,
+            message: 'Missing Longfor credentials. Configure LONGFOR_AUTHORIZATION and LONGFOR_X_GAIA_API_KEY, or configure LONGFOR_CASTGC.',
+        });
+        return;
+    }
+    try {
+        const upstreamResponse = await fetch(env.longforQueryReportUrl, {
+            method: 'POST',
+            headers: {
+                ...longforConfig.headers,
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+        });
+        const data = await parseUpstreamResponse(upstreamResponse);
+        response.status(upstreamResponse.status).json({
+            ok: upstreamResponse.ok,
+            upstreamStatus: upstreamResponse.status,
+            upstreamUrl: env.longforQueryReportUrl,
+            requestPayload: payload,
+            data,
+        });
+    }
+    catch (error) {
+        response.status(502).json({
+            ok: false,
+            upstreamStatus: 502,
+            upstreamUrl: env.longforQueryReportUrl,
+            requestPayload: payload,
+            message: error instanceof Error ? error.message : 'Failed to proxy queryReport.',
+        });
+    }
+});
+app.post('/api/energy/query-report-legacy', async (request, response) => {
     const longforConfig = buildLongforHeaders();
     const payload = (request.body?.payload ?? request.body ?? {});
     if (!hasLongforCredentials(longforConfig)) {

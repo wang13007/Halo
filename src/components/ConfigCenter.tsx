@@ -23,6 +23,62 @@ type SystemCard = {
   url: string;
 };
 
+type RequestRecord = {
+  channel: string;
+  id: string;
+  label: string;
+  meta: string;
+  status: string;
+  time: string;
+};
+
+const toTimestamp = (value: string | null) => {
+  if (!value) {
+    return 0;
+  }
+
+  const timestamp = new Date(value).getTime();
+  return Number.isNaN(timestamp) ? 0 : timestamp;
+};
+
+const formatRecordTime = (value: string | null) => {
+  if (!value) {
+    return '未记录';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return '未记录';
+  }
+
+  return date.toLocaleString('zh-CN', {
+    hour12: false,
+  });
+};
+
+const getStatusPillClass = (status: string) => {
+  const normalizedStatus = status.trim().toLowerCase();
+
+  if (
+    normalizedStatus.includes('fail') ||
+    normalizedStatus.includes('error') ||
+    normalizedStatus.includes('offline')
+  ) {
+    return 'bg-rose-500/10 text-rose-600';
+  }
+
+  if (
+    normalizedStatus.includes('pending') ||
+    normalizedStatus.includes('wait') ||
+    normalizedStatus.includes('draft')
+  ) {
+    return 'bg-amber-500/10 text-amber-600';
+  }
+
+  return 'bg-blue-500/10 text-blue-600';
+};
+
 const systemCards: SystemCard[] = [
   {
     accent: 'from-blue-600/15 via-cyan-500/10 to-transparent',
@@ -171,12 +227,66 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
     );
   }, [runtimeState.integrations, selectedSystem]);
 
+  const requestRecords = useMemo<RequestRecord[]>(() => {
+    if (!selectedSystem) {
+      return [];
+    }
+
+    if (selectedSystem.id === 'supabase') {
+      return [...runtimeState.reports]
+        .sort((left, right) => toTimestamp(right.created_at) - toTimestamp(left.created_at))
+        .slice(0, 6)
+        .map((report) => ({
+          channel: 'REPORT',
+          id: report.id,
+          label: report.title,
+          meta: report.summary,
+          status: report.status,
+          time: formatRecordTime(report.created_at),
+        }));
+    }
+
+    return [...matchingIntegrations]
+      .sort(
+        (left, right) =>
+          toTimestamp(right.last_synced_at ?? right.created_at) -
+          toTimestamp(left.last_synced_at ?? left.created_at),
+      )
+      .slice(0, 6)
+      .map((integration) => ({
+        channel: integration.auth_type ? integration.auth_type.toUpperCase() : 'SYNC',
+        id: integration.id,
+        label: integration.name,
+        meta: integration.base_url,
+        status: integration.status,
+        time: formatRecordTime(integration.last_synced_at ?? integration.created_at),
+      }));
+  }, [matchingIntegrations, runtimeState.reports, selectedSystem]);
+
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
   const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
+  const textTertiary = isDarkMode ? 'text-slate-500' : 'text-slate-400';
   const cardSurface = isDarkMode
     ? 'border-white/10 bg-slate-900/70'
     : 'border-white/80 bg-white/84';
   const mutedSurface = isDarkMode ? 'bg-white/5' : 'bg-slate-50';
+  const apiStatusText = runtimeState.isLoading
+    ? '读取中'
+    : runtimeState.health?.status ?? (runtimeState.error ? '异常' : '未知');
+  const runtimeStatusText = runtimeState.isLoading
+    ? '读取中'
+    : selectedSystem?.id === 'supabase'
+      ? runtimeState.health?.database.schemaReady === true
+        ? '已初始化'
+        : runtimeState.health
+          ? '未初始化'
+          : '未知'
+      : matchingIntegrations.length > 0
+        ? '已登记'
+        : '待登记';
+  const requestRecordCountText = runtimeState.isLoading
+    ? '读取中'
+    : `${selectedSystem?.id === 'supabase' ? runtimeState.reports.length : matchingIntegrations.length} 条`;
 
   return (
     <div className="flex h-full flex-col justify-start overflow-y-auto pr-1 xl:overflow-hidden xl:pr-0">
@@ -230,70 +340,31 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
             </div>
 
             <div className="max-h-[calc(88vh-92px)] overflow-y-auto px-6 pb-6">
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
-                <section className={`rounded-[28px] border p-5 ${cardSurface}`}>
-                  <h3 className={`text-sm font-black tracking-[0.22em] uppercase ${textSecondary}`}>
-                    后端接入状态
-                  </h3>
-                  <div className="mt-4 grid gap-4 sm:grid-cols-3">
-                    <StatusCard
-                      label="API 状态"
-                      tone="blue"
-                      value={runtimeState.isLoading ? '读取中' : runtimeState.health?.status ?? '未知'}
-                    />
-                    <StatusCard
-                      label={selectedSystem.id === 'supabase' ? 'Schema' : '接入准备'}
-                      tone="emerald"
-                      value={
-                        runtimeState.isLoading
-                          ? '读取中'
-                          : selectedSystem.id === 'supabase'
-                            ? runtimeState.health?.database.schemaReady
-                              ? '已初始化'
-                              : '未初始化'
-                            : matchingIntegrations.length > 0
-                              ? '已登记'
-                              : '待登记'
-                      }
-                    />
-                    <StatusCard
-                      label="项目数量"
-                      tone="amber"
-                      value={runtimeState.isLoading ? '--' : String(runtimeState.projects.length)}
-                    />
-                  </div>
+              <section className={`rounded-[28px] border p-5 ${cardSurface}`}>
+                <h3 className={`text-sm font-black tracking-[0.22em] uppercase ${textSecondary}`}>
+                  系统信息
+                </h3>
+                <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2 xl:grid-cols-3">
+                  <DetailRow label="系统名称" value={selectedSystem.name} />
+                  <DetailRow label="访问地址" value={selectedSystem.url} />
+                  <DetailRow label="API 状态" value={apiStatusText} />
+                  <DetailRow
+                    label={selectedSystem.id === 'supabase' ? 'Schema 状态' : '接入状态'}
+                    value={runtimeStatusText}
+                  />
+                  <DetailRow
+                    label="项目数量"
+                    value={runtimeState.isLoading ? '读取中' : String(runtimeState.projects.length)}
+                  />
+                  <DetailRow label="请求记录" value={requestRecordCountText} />
+                </div>
 
-                  <div className="mt-5 rounded-[24px] border border-blue-500/10 bg-blue-500/5 p-4 text-sm leading-7 text-slate-500">
-                    {runtimeState.error
-                      ? `当前读取存在异常：${runtimeState.error}`
-                      : '状态数据已集中到详情窗口中展示，主页面仅保留系统入口卡片。'}
-                  </div>
-                </section>
-
-                <section className={`rounded-[28px] border p-5 ${cardSurface}`}>
-                  <h3 className={`text-sm font-black tracking-[0.22em] uppercase ${textSecondary}`}>
-                    系统信息
-                  </h3>
-                  <div className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
-                    <DetailRow label="系统名称" value={selectedSystem.name} />
-                    <DetailRow label="访问地址" value={selectedSystem.url} />
-                    <DetailRow
-                      label="接入记录"
-                      value={
-                        runtimeState.isLoading
-                          ? '读取中'
-                          : `${matchingIntegrations.length} 条${
-                              matchingIntegrations.length > 0 ? '，已登记' : '，待同步'
-                            }`
-                      }
-                    />
-                    <DetailRow
-                      label="报表记录"
-                      value={runtimeState.isLoading ? '读取中' : `${runtimeState.reports.length} 条`}
-                    />
-                  </div>
-                </section>
-              </div>
+                <div className="mt-5 rounded-[24px] border border-blue-500/10 bg-blue-500/5 p-4 text-sm leading-7 text-slate-500">
+                  {runtimeState.error
+                    ? `当前读取存在异常：${runtimeState.error}`
+                    : '详情窗口当前仅展示系统信息、接口清单和请求记录。'}
+                </div>
+              </section>
 
               <section className={`mt-5 rounded-[28px] border p-5 ${cardSurface}`}>
                 <div className="flex items-center gap-2">
@@ -332,36 +403,44 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
                 <div className="flex items-center gap-2">
                   <Server size={16} className="text-violet-600" />
                   <h3 className={`text-sm font-black tracking-[0.22em] uppercase ${textSecondary}`}>
-                    最近接入记录
+                    请求记录
                   </h3>
                 </div>
                 <div className="mt-4 space-y-3">
-                  {matchingIntegrations.length === 0 && !runtimeState.isLoading && (
+                  {requestRecords.length === 0 && !runtimeState.isLoading && (
                     <div className={`rounded-[22px] p-4 text-sm ${textSecondary} ${mutedSurface}`}>
-                      当前还没有匹配到接入记录。
+                      当前还没有匹配到请求记录。
                     </div>
                   )}
 
                   {runtimeState.isLoading && (
                     <div className={`rounded-[22px] p-4 text-sm ${textSecondary} ${mutedSurface}`}>
-                      正在读取接入记录...
+                      正在读取请求记录...
                     </div>
                   )}
 
-                  {matchingIntegrations.map((integration) => (
+                  {requestRecords.map((record) => (
                     <div
-                      key={integration.id}
+                      key={record.id}
                       className={`rounded-[22px] border p-4 ${cardSurface}`}
                     >
                       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                         <div className="min-w-0">
-                          <div className={`font-semibold ${textPrimary}`}>{integration.name}</div>
-                          <div className={`mt-1 break-all text-xs leading-5 ${textSecondary}`}>
-                            {integration.base_url}
+                          <div className="flex flex-wrap items-center gap-2">
+                            <div className={`font-semibold ${textPrimary}`}>{record.label}</div>
+                            <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${mutedSurface} ${textSecondary}`}>
+                              {record.channel}
+                            </span>
+                          </div>
+                          <div className={`mt-2 break-all text-xs leading-5 ${textSecondary}`}>
+                            {record.meta}
+                          </div>
+                          <div className={`mt-2 text-xs ${textTertiary}`}>
+                            请求时间：{record.time}
                           </div>
                         </div>
-                        <span className="rounded-full bg-blue-500/10 px-3 py-1 text-xs font-bold text-blue-600">
-                          {integration.status}
+                        <span className={`rounded-full px-3 py-1 text-xs font-bold ${getStatusPillClass(record.status)}`}>
+                          {record.status}
                         </span>
                       </div>
                     </div>
@@ -372,32 +451,6 @@ export const ConfigCenter = ({ isDarkMode }: { isDarkMode: boolean }) => {
           </div>
         </div>
       )}
-    </div>
-  );
-};
-
-const StatusCard = ({
-  label,
-  tone,
-  value,
-}: {
-  label: string;
-  tone: 'amber' | 'blue' | 'emerald';
-  value: string;
-}) => {
-  const toneClass =
-    tone === 'blue'
-      ? 'bg-blue-500/10 text-blue-600'
-      : tone === 'emerald'
-        ? 'bg-emerald-500/10 text-emerald-600'
-        : 'bg-amber-500/10 text-amber-600';
-
-  return (
-    <div className="rounded-[22px] border border-slate-200/70 bg-slate-50/80 p-4 dark:border-white/10 dark:bg-white/5">
-      <div className="text-xs font-bold uppercase tracking-[0.2em] text-slate-400">{label}</div>
-      <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-sm font-bold ${toneClass}`}>
-        {value}
-      </div>
     </div>
   );
 };

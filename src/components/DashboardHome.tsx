@@ -39,9 +39,11 @@ type WidgetPaletteDefinition = {
 };
 
 type WidgetPalette = WidgetPaletteDefinition & {
+  barFillClass: string;
   dotClass: string;
   glowClass: string;
   iconWrapClass: string;
+  itemIconClass: string;
   pillClass: string;
 };
 
@@ -96,6 +98,88 @@ const widgetPaletteMap: Record<string, WidgetPaletteDefinition> = {
   'widget-breakdown': { chipLabel: '结构分析', icon: BarChart3, tone: 'amber' },
   'widget-actions': { chipLabel: '执行清单', icon: ListTodo, tone: 'slate' },
   'widget-rhythm': { chipLabel: '运行节奏', icon: Activity, tone: 'blue' },
+};
+
+type WidgetVisualDefinition = {
+  bars: number[];
+  icons: LucideIcon[];
+};
+
+type DashboardWidgetCardProps = {
+  highlight?: boolean;
+  isDarkMode: boolean;
+  mode: WidgetCardMode;
+  onRemove?: () => void;
+  widget: DashboardWidget;
+};
+
+const widgetVisualBarLimitMap: Record<WidgetSize, number> = {
+  large: 6,
+  medium: 5,
+  small: 4,
+};
+
+const widgetVisualIconLimitMap: Record<WidgetSize, number> = {
+  large: 3,
+  medium: 3,
+  small: 2,
+};
+
+const widgetVisualPaddingClassMap: Record<WidgetSize, string> = {
+  large: 'p-3.5',
+  medium: 'p-3',
+  small: 'p-2.5',
+};
+
+const widgetVisualHeightClassMap: Record<WidgetSize, string> = {
+  large: 'h-16',
+  medium: 'h-14',
+  small: 'h-12',
+};
+
+const widgetVisualBadgeClassMap: Record<WidgetSize, string> = {
+  large: 'h-9 w-9 rounded-[16px]',
+  medium: 'h-8 w-8 rounded-[14px]',
+  small: 'h-7 w-7 rounded-[12px]',
+};
+
+const widgetVisualBarWidthClassMap: Record<WidgetSize, string> = {
+  large: 'w-3',
+  medium: 'w-3',
+  small: 'w-2.5',
+};
+
+const widgetItemIconSizeMap: Record<WidgetSize, number> = {
+  large: 14,
+  medium: 13,
+  small: 12,
+};
+
+const widgetVisualMap: Record<string, WidgetVisualDefinition> = {
+  'widget-energy': {
+    bars: [34, 56, 78, 62, 88, 70],
+    icons: [Bolt, Activity, BarChart3],
+  },
+  'widget-integration': {
+    bars: [80, 72, 86, 78, 90, 84],
+    icons: [ShieldCheck, Sparkles, Activity],
+  },
+  'widget-focus': {
+    bars: [68, 44, 76, 58, 40, 72],
+    icons: [Target, Sparkles, ListTodo],
+  },
+  'widget-breakdown': {
+    bars: [82, 64, 52, 74, 60, 48],
+    icons: [BarChart3, Bolt, Activity],
+  },
+  'widget-actions': {
+    bars: [40, 58, 72, 66, 80, 88],
+    icons: [ListTodo, Target, Sparkles],
+  },
+  'widget-rhythm': {
+    bars: [48, 62, 56, 74, 60, 70],
+    icons: [Activity, BarChart3, Sparkles],
+  },
 };
 
 const clampTextStyle = (lines: number): CSSProperties =>
@@ -168,70 +252,85 @@ const getWidgetPalette = (widget: DashboardWidget, isDarkMode: boolean): WidgetP
     case 'amber':
       return {
         ...definition,
+        barFillClass: 'bg-amber-400/85',
         dotClass: 'bg-amber-400',
         glowClass: 'bg-amber-300/20',
         iconWrapClass: isDarkMode ? 'bg-amber-400/16 text-amber-200' : 'bg-amber-100 text-amber-700',
+        itemIconClass: isDarkMode ? 'text-amber-200' : 'text-amber-700',
         pillClass: isDarkMode ? 'bg-amber-400/14 text-amber-100' : 'bg-amber-50 text-amber-700',
       };
     case 'blue':
       return {
         ...definition,
+        barFillClass: 'bg-blue-400/85',
         dotClass: 'bg-blue-400',
         glowClass: 'bg-blue-400/18',
         iconWrapClass: isDarkMode ? 'bg-blue-400/16 text-blue-200' : 'bg-blue-100 text-blue-700',
+        itemIconClass: isDarkMode ? 'text-blue-200' : 'text-blue-700',
         pillClass: isDarkMode ? 'bg-blue-400/14 text-blue-100' : 'bg-blue-50 text-blue-700',
       };
     case 'cyan':
       return {
         ...definition,
+        barFillClass: 'bg-cyan-400/85',
         dotClass: 'bg-cyan-400',
         glowClass: 'bg-cyan-300/20',
         iconWrapClass: isDarkMode ? 'bg-cyan-400/16 text-cyan-200' : 'bg-cyan-100 text-cyan-700',
+        itemIconClass: isDarkMode ? 'text-cyan-200' : 'text-cyan-700',
         pillClass: isDarkMode ? 'bg-cyan-400/14 text-cyan-100' : 'bg-cyan-50 text-cyan-700',
       };
     case 'emerald':
       return {
         ...definition,
+        barFillClass: 'bg-emerald-400/85',
         dotClass: 'bg-emerald-400',
         glowClass: 'bg-emerald-300/20',
         iconWrapClass: isDarkMode ? 'bg-emerald-400/16 text-emerald-200' : 'bg-emerald-100 text-emerald-700',
+        itemIconClass: isDarkMode ? 'text-emerald-200' : 'text-emerald-700',
         pillClass: isDarkMode ? 'bg-emerald-400/14 text-emerald-100' : 'bg-emerald-50 text-emerald-700',
       };
     case 'violet':
       return {
         ...definition,
+        barFillClass: 'bg-violet-400/85',
         dotClass: 'bg-violet-400',
         glowClass: 'bg-violet-300/20',
         iconWrapClass: isDarkMode ? 'bg-violet-400/16 text-violet-200' : 'bg-violet-100 text-violet-700',
+        itemIconClass: isDarkMode ? 'text-violet-200' : 'text-violet-700',
         pillClass: isDarkMode ? 'bg-violet-400/14 text-violet-100' : 'bg-violet-50 text-violet-700',
       };
     case 'slate':
     default:
       return {
         ...definition,
+        barFillClass: isDarkMode ? 'bg-slate-200/85' : 'bg-slate-500/85',
         dotClass: 'bg-slate-400',
         glowClass: 'bg-slate-400/14',
         iconWrapClass: isDarkMode ? 'bg-white/10 text-slate-100' : 'bg-slate-100 text-slate-700',
+        itemIconClass: isDarkMode ? 'text-slate-100' : 'text-slate-700',
         pillClass: isDarkMode ? 'bg-white/10 text-slate-100' : 'bg-slate-100 text-slate-700',
       };
   }
 };
 
-const DashboardWidgetCard = ({
+const getWidgetVisual = (widget: DashboardWidget): WidgetVisualDefinition =>
+  widgetVisualMap[widget.id] ?? {
+    bars: [40, 58, 72, 60, 78, 66],
+    icons: [Sparkles, BarChart3, Activity],
+  };
+
+const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
   highlight = false,
   isDarkMode,
   mode,
   onRemove,
   widget,
-}: {
-  highlight?: boolean;
-  isDarkMode: boolean;
-  mode: WidgetCardMode;
-  onRemove?: () => void;
-  widget: DashboardWidget;
 }) => {
   const visibleItems = widget.items.slice(0, widgetItemLimitMap[widget.size]);
   const hiddenItemsCount = Math.max(widget.items.length - visibleItems.length, 0);
+  const visual = getWidgetVisual(widget);
+  const visibleVisualIcons = visual.icons.slice(0, widgetVisualIconLimitMap[widget.size]);
+  const visibleVisualBars = visual.bars.slice(0, widgetVisualBarLimitMap[widget.size]);
   const palette = getWidgetPalette(widget, isDarkMode);
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
   const textSecondary = isDarkMode ? 'text-slate-200/90' : 'text-slate-700';
@@ -245,6 +344,10 @@ const DashboardWidgetCard = ({
   const itemSurface = isDarkMode
     ? 'border-white/10 bg-white/[0.08] text-slate-100'
     : 'border-white/85 bg-white/64 text-slate-700';
+  const visualPanelSurface = isDarkMode
+    ? 'border-white/10 bg-slate-950/18'
+    : 'border-white/80 bg-white/42';
+  const chartTrackSurface = isDarkMode ? 'bg-white/[0.09]' : 'bg-white/55';
   const removeButtonSurface = isDarkMode
     ? 'border-white/10 bg-slate-950/55 text-slate-100 hover:bg-slate-950/70'
     : 'border-white/80 bg-white/70 text-slate-700 hover:bg-white';
@@ -264,38 +367,68 @@ const DashboardWidgetCard = ({
         <div className="relative flex h-full flex-col">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <div className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${textTertiary}`}>
-                {palette.chipLabel}
-              </div>
-              <h2 className={`mt-2 break-words font-semibold leading-tight ${widgetTitleClassMap[widget.size]} ${textPrimary}`}>
+              <h2 className={`break-words font-semibold leading-tight ${widgetTitleClassMap[widget.size]} ${textPrimary}`}>
                 {widget.title}
               </h2>
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <div className={`inline-flex h-10 w-10 items-center justify-center rounded-[18px] border ${chromeSurface} ${textPrimary}`}>
-                {mode === 'preview' ? <GripVertical size={16} /> : <palette.icon size={18} />}
+              {mode === 'preview' && (
+                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-[18px] border ${chromeSurface} ${textPrimary}`}>
+                  <GripVertical size={16} />
+                </div>
+              )}
+              <div className={`inline-flex h-10 w-10 items-center justify-center rounded-[18px] border ${chromeSurface} ${palette.itemIconClass}`}>
+                <palette.icon size={18} />
               </div>
             </div>
           </div>
 
-            <div className="mt-auto">
-              <div className="flex items-end justify-between gap-3">
-                <div className={`min-w-0 font-black leading-none tracking-tight ${metricClassName} ${textPrimary}`}>
-                  {widget.value}
-                </div>
-                <div className="flex shrink-0 items-center gap-2">
-                  {mode === 'preview' && onRemove && (
-                    <button
-                      type="button"
-                      onClick={onRemove}
-                      className={`rounded-full border px-3 py-1 text-[11px] font-bold transition ${removeButtonSurface}`}
-                    >
-                      移出
-                    </button>
-                  )}
-                </div>
+          <div className={`mt-4 rounded-[22px] border ${visualPanelSurface} ${widgetVisualPaddingClassMap[widget.size]}`}>
+            <div className="flex items-end justify-between gap-3">
+              <div className="flex items-center gap-2">
+                {visibleVisualIcons.map((Icon, index) => (
+                  <span
+                    key={`${widget.id}-visual-icon-${index}`}
+                    className={`inline-flex items-center justify-center border ${chromeSurface} ${widgetVisualBadgeClassMap[widget.size]} ${palette.itemIconClass}`}
+                  >
+                    <Icon size={widget.size === 'large' ? 16 : 14} />
+                  </span>
+                ))}
               </div>
+              <div className={`flex flex-1 items-end justify-end gap-1.5 ${widgetVisualHeightClassMap[widget.size]}`}>
+                {visibleVisualBars.map((height, index) => (
+                  <span
+                    key={`${widget.id}-visual-bar-${index}`}
+                    className={`relative overflow-hidden rounded-full ${widgetVisualBarWidthClassMap[widget.size]} ${chartTrackSurface}`}
+                  >
+                    <span
+                      className={`absolute inset-x-0 bottom-0 rounded-full ${palette.barFillClass}`}
+                      style={{ height: `${height}%` }}
+                    />
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-auto">
+            <div className="flex items-end justify-between gap-3">
+              <div className={`min-w-0 font-black leading-none tracking-tight ${metricClassName} ${textPrimary}`}>
+                {widget.value}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                {mode === 'preview' && onRemove && (
+                  <button
+                    type="button"
+                    onClick={onRemove}
+                    className={`rounded-full border px-3 py-1 text-[11px] font-bold transition ${removeButtonSurface}`}
+                  >
+                    移出
+                  </button>
+                )}
+              </div>
+            </div>
 
             <p
               className={`mt-2 text-sm font-medium leading-5 ${textSecondary}`}
@@ -314,15 +447,19 @@ const DashboardWidgetCard = ({
             )}
 
             <div className="mt-4 flex flex-wrap gap-2">
-              {visibleItems.map((item, index) => (
-                <span
-                  key={`${widget.id}-${index}`}
-                  className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${itemSurface}`}
-                >
-                  <span className={`h-2 w-2 shrink-0 rounded-full ${palette.dotClass}`} />
-                  <span className="truncate">{item}</span>
-                </span>
-              ))}
+              {visibleItems.map((item, index) => {
+                const ItemIcon = visibleVisualIcons[index % visibleVisualIcons.length] ?? palette.icon;
+
+                return (
+                  <span
+                    key={`${widget.id}-${index}`}
+                    className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${itemSurface}`}
+                  >
+                    <ItemIcon size={widgetItemIconSizeMap[widget.size]} className={`shrink-0 ${palette.itemIconClass}`} />
+                    <span className="truncate">{item}</span>
+                  </span>
+                );
+              })}
               {hiddenItemsCount > 0 && (
                 <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${chromeSurface} ${textPrimary}`}>
                   +{hiddenItemsCount}

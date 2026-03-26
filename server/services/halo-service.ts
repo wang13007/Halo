@@ -1,4 +1,7 @@
+import fs from 'node:fs';
+import path from 'node:path';
 import { randomUUID } from 'node:crypto';
+import { fileURLToPath } from 'node:url';
 import { format } from 'date-fns';
 import { getSupabase } from '../lib/supabase.js';
 
@@ -16,6 +19,37 @@ type EnergyMetricRow = {
   metric_at: string;
   source: string;
   usage_kwh: number | null;
+};
+
+type ImportedEnergyProjectRow = {
+  code: string;
+  id: string;
+  metadata: Record<string, unknown> | null;
+  name: string;
+};
+
+type ImportedEnergyMetricRow = {
+  energy_type: string;
+  metadata: Record<string, unknown> | null;
+  metric_at: string;
+  source: string;
+  usage_kwh: number | string | null;
+};
+
+type ImportedEnergyQueryRow = {
+  energy_path: string;
+  granularity: string;
+  meter_name: string;
+  meter_number: string;
+  meter_type: string;
+  metadata: Record<string, unknown> | null;
+  org_id: string;
+  organization_path: string;
+  project_code: string;
+  project_name: string;
+  sample_date: string;
+  source_file: string;
+  usage_kwh: number | string | null;
 };
 
 type IntegrationInput = {
@@ -48,6 +82,35 @@ type ReportInput = {
   status?: string;
   summary?: string;
   title: string;
+};
+
+export type ImportedEnergyProject = {
+  firstSampleDate: string;
+  lastSampleDate: string;
+  orgId: string;
+  organizationPath: string;
+  projectCode: string;
+  projectName: string;
+  recordCount: number;
+};
+
+export type ImportedEnergyReport = {
+  list: Array<Record<string, unknown>>;
+  pageNum: number;
+  pageSize: number;
+  summary: {
+    endDate: string;
+    matchedRecordCount: number;
+    meterCount: number;
+    meterType: string;
+    orgId: string;
+    projectName: string;
+    requestedGranularity: 'day' | 'hour';
+    returnedGranularity: string;
+    startDate: string;
+    totalUsageKwh: number;
+  };
+  total: number;
 };
 
 export type ChatSessionMessage = {
@@ -92,6 +155,26 @@ type ChatSessionInput = {
   title?: string;
 };
 
+type ImportedEnergyDataset = {
+  projects: ImportedEnergyProject[];
+  records: ImportedEnergyQueryRow[];
+};
+
+const currentDir = path.dirname(fileURLToPath(import.meta.url));
+const projectRootCandidates = [
+  path.resolve(currentDir, '..', '..'),
+  path.resolve(currentDir, '..', '..', '..'),
+];
+const projectRoot =
+  projectRootCandidates.find((candidate) => fs.existsSync(path.join(candidate, 'package.json'))) ??
+  path.resolve(currentDir, '..', '..');
+const localImportedEnergyDataPath = path.join(
+  projectRoot,
+  'server',
+  'data',
+  'imported-energy-data.json',
+);
+
 const sumBy = <T>(items: T[], selector: (item: T) => number | null | undefined) =>
   items.reduce((total, item) => total + (selector(item) ?? 0), 0);
 
@@ -131,6 +214,19 @@ const endOfPreviousMonth = (date = new Date()) => {
 const isPlainObject = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === 'object' && !Array.isArray(value);
 
+const normalizeStringValue = (value: unknown) => {
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    return trimmed || '';
+  }
+
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return '';
+};
+
 const truncateText = (value: string, maxLength: number) => {
   const trimmed = value.trim();
   if (trimmed.length <= maxLength) {
@@ -147,6 +243,226 @@ const toValidIsoString = (value: unknown) => {
 
   const timestamp = Date.parse(value);
   return Number.isNaN(timestamp) ? '' : new Date(timestamp).toISOString();
+};
+
+const toFiniteNumber = (value: unknown) => {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : 0;
+  }
+
+  return 0;
+};
+
+const parsePositiveInteger = (value: unknown, fallback: number) => {
+  const normalized = Math.floor(toFiniteNumber(value));
+
+  if (normalized <= 0) {
+    return fallback;
+  }
+
+  return normalized;
+};
+
+const dateFormatterCache = new Map<string, Intl.DateTimeFormat>();
+
+const getDateFormatter = (timeZone: string) => {
+  const cached = dateFormatterCache.get(timeZone);
+
+  if (cached) {
+    return cached;
+  }
+
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    day: '2-digit',
+    month: '2-digit',
+    timeZone,
+    year: 'numeric',
+  });
+
+  dateFormatterCache.set(timeZone, formatter);
+  return formatter;
+};
+
+const formatDateInTimeZone = (value: number | Date, timeZone: string) => {
+  const parts = getDateFormatter(timeZone).formatToParts(
+    typeof value === 'number' ? new Date(value) : value,
+  );
+  const year = parts.find((part) => part.type === 'year')?.value ?? '';
+  const month = parts.find((part) => part.type === 'month')?.value ?? '';
+  const day = parts.find((part) => part.type === 'day')?.value ?? '';
+
+  return year && month && day ? `${year}-${month}-${day}` : '';
+};
+
+const normalizeSearchText = (value: unknown) => normalizeStringValue(value).toLowerCase();
+
+const buildSearchTerms = (value: unknown) =>
+  normalizeSearchText(value)
+    .split(/\s+/)
+    .map((term) => term.trim())
+    .filter(Boolean);
+
+const resolveDateFromTimestamp = (value: unknown, timeZone = 'Asia/Shanghai') => {
+  const timestamp = toFiniteNumber(value);
+
+  if (!timestamp) {
+    return '';
+  }
+
+  return formatDateInTimeZone(timestamp, timeZone);
+};
+
+const matchesImportedEnergyQuery = (
+  row: ImportedEnergyQueryRow,
+  queryName?: unknown,
+) => {
+  const terms = buildSearchTerms(queryName);
+
+  if (terms.length === 0) {
+    return true;
+  }
+
+  const haystack = [
+    row.energy_path,
+    row.meter_name,
+    row.meter_number,
+    row.organization_path,
+    row.project_name,
+    row.project_code,
+    row.sample_date,
+  ]
+    .map((item) => item.toLowerCase())
+    .join(' ');
+
+  return terms.every((term) => haystack.includes(term));
+};
+
+const isImportedEnergyProject = (row: ImportedEnergyProjectRow) =>
+  normalizeStringValue(row.metadata?.source) === 'energy-report-import';
+
+const toImportedEnergyQueryRow = (
+  row: ImportedEnergyMetricRow,
+  project: ImportedEnergyProjectRow,
+): ImportedEnergyQueryRow => {
+  const metadata = normalizeMetadata(row.metadata);
+  const sampleDate =
+    normalizeStringValue(metadata.sampleDate) ||
+    formatDateInTimeZone(Date.parse(row.metric_at), 'Asia/Shanghai');
+
+  return {
+    energy_path: normalizeStringValue(metadata.energyPath) || 'Uncategorized',
+    granularity: normalizeStringValue(metadata.granularity) || 'day',
+    meter_name: normalizeStringValue(metadata.meterName) || row.source,
+    meter_number: normalizeStringValue(metadata.meterNumber) || row.source,
+    meter_type: normalizeStringValue(row.energy_type) || 'electricity',
+    metadata,
+    org_id: project.code,
+    organization_path: normalizeStringValue(metadata.organizationPath),
+    project_code: project.code,
+    project_name: project.name,
+    sample_date: sampleDate,
+    source_file: normalizeStringValue(metadata.sourceFile),
+    usage_kwh: row.usage_kwh,
+  };
+};
+
+let cachedImportedEnergyData: ImportedEnergyDataset | null | undefined;
+
+const readLocalImportedEnergyData = (): ImportedEnergyDataset | null => {
+  if (cachedImportedEnergyData !== undefined) {
+    return cachedImportedEnergyData;
+  }
+
+  if (!fs.existsSync(localImportedEnergyDataPath)) {
+    cachedImportedEnergyData = null;
+    return cachedImportedEnergyData;
+  }
+
+  try {
+    const parsed = JSON.parse(
+      fs.readFileSync(localImportedEnergyDataPath, 'utf8'),
+    ) as Partial<ImportedEnergyDataset>;
+    const projects = Array.isArray(parsed.projects)
+      ? (parsed.projects as ImportedEnergyProject[])
+      : [];
+    const records = Array.isArray(parsed.records)
+      ? (parsed.records as ImportedEnergyQueryRow[])
+      : [];
+
+    cachedImportedEnergyData = { projects, records };
+    return cachedImportedEnergyData;
+  } catch {
+    cachedImportedEnergyData = null;
+    return cachedImportedEnergyData;
+  }
+};
+
+const buildImportedEnergyReportResponse = (
+  rows: ImportedEnergyQueryRow[],
+  options: {
+    endDate: string;
+    meterType: string;
+    orgId: string;
+    pageNum: number;
+    pageSize: number;
+    projectName: string;
+    requestedGranularity: 'day' | 'hour';
+    startDate: string;
+  },
+): ImportedEnergyReport => {
+  const total = rows.length;
+  const offset = (options.pageNum - 1) * options.pageSize;
+  const pagedRows = rows.slice(offset, offset + options.pageSize);
+  const sampleDates = [...new Set(rows.map((row) => row.sample_date))].sort();
+  const meterCount = new Set(rows.map((row) => row.meter_number)).size;
+  const totalUsageKwh = rows.reduce(
+    (sum, row) => sum + toFiniteNumber(row.usage_kwh),
+    0,
+  );
+
+  return {
+    list: pagedRows.map((row) => ({
+      deviceId: row.meter_number,
+      deviceName: row.meter_name,
+      deviceNumber: row.meter_number,
+      energyItemPath: row.energy_path,
+      granularity: row.granularity,
+      meterName: row.meter_name,
+      meterType: row.meter_type,
+      metadata: row.metadata ?? {},
+      orgId: row.org_id,
+      orgName: row.project_name,
+      orgPath: row.organization_path,
+      projectCode: row.project_code,
+      projectName: row.project_name,
+      sampleDate: row.sample_date,
+      sampleTime: row.sample_date,
+      sourceFile: row.source_file,
+      totalOne: Number(toFiniteNumber(row.usage_kwh).toFixed(2)),
+      unit: 'kWh',
+      usageKwh: Number(toFiniteNumber(row.usage_kwh).toFixed(2)),
+    })),
+    pageNum: options.pageNum,
+    pageSize: options.pageSize,
+    summary: {
+      endDate: sampleDates.at(-1) ?? options.endDate,
+      matchedRecordCount: total,
+      meterCount,
+      meterType: options.meterType,
+      orgId: options.orgId,
+      projectName: options.projectName,
+      requestedGranularity: options.requestedGranularity,
+      returnedGranularity: rows[0]?.granularity ?? 'day',
+      startDate: sampleDates[0] ?? options.startDate,
+      totalUsageKwh: Number(totalUsageKwh.toFixed(2)),
+    },
+    total,
+  };
 };
 
 const normalizeChatMessages = (messages: unknown): ChatSessionMessage[] => {
@@ -457,6 +773,166 @@ export const createEnergyMetric = async (input: MetricInput) => {
   }
 
   return data;
+};
+
+const loadImportedProjectRows = async () => {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('projects')
+    .select('id, code, name, metadata')
+    .order('name', { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return ((data ?? []) as ImportedEnergyProjectRow[]).filter((row) =>
+    isImportedEnergyProject(row),
+  );
+};
+
+export const listImportedEnergyProjects = async (): Promise<ImportedEnergyProject[]> => {
+  const localData = readLocalImportedEnergyData();
+
+  if (localData && localData.projects.length > 0) {
+    return localData.projects;
+  }
+
+  try {
+    const rows = await loadImportedProjectRows();
+
+    if (rows.length > 0) {
+      return rows.map((row) => ({
+        firstSampleDate: normalizeStringValue(row.metadata?.firstSampleDate),
+        lastSampleDate: normalizeStringValue(row.metadata?.lastSampleDate),
+        orgId: row.code,
+        organizationPath: normalizeStringValue(row.metadata?.organizationPath),
+        projectCode: row.code,
+        projectName: row.name,
+        recordCount: parsePositiveInteger(row.metadata?.recordCount, 0),
+      }));
+    }
+  } catch {
+    // Fall back to the local imported cache when Supabase tables are not ready yet.
+  }
+
+  return readLocalImportedEnergyData()?.projects ?? [];
+};
+
+export const queryImportedEnergyReport = async (
+  payload: Record<string, unknown>,
+): Promise<ImportedEnergyReport> => {
+  const orgId = normalizeStringValue(payload.orgId);
+  const meterType = normalizeSearchText(payload.meterType) || 'electricity';
+  const startDate = resolveDateFromTimestamp(payload.startTime);
+  const endDate = resolveDateFromTimestamp(payload.endTime);
+  const pageNum = parsePositiveInteger(payload.pageNum, 1);
+  const pageSize = Math.min(parsePositiveInteger(payload.pageSize, 20), 200);
+  const requestedGranularity =
+    parsePositiveInteger(payload.queryType, 2) === 1 ? 'hour' : 'day';
+  const localData = readLocalImportedEnergyData();
+
+  if (localData && localData.projects.length > 0) {
+    const localProject = orgId
+      ? localData.projects.find((project) => project.orgId === orgId)
+      : localData.projects[0];
+    const scopedLocalRows =
+      orgId && !localProject
+        ? []
+        : localData.records.filter((row) => !localProject || row.org_id === localProject.orgId);
+    const filteredRows = scopedLocalRows
+      .filter((row) => row.meter_type === meterType)
+      .filter(
+        (row) =>
+          (!startDate || row.sample_date >= startDate) &&
+          (!endDate || row.sample_date <= endDate),
+      )
+      .filter((row) => matchesImportedEnergyQuery(row, payload.queryName));
+
+    return buildImportedEnergyReportResponse(filteredRows, {
+      endDate,
+      meterType,
+      orgId: localProject?.orgId ?? orgId,
+      pageNum,
+      pageSize,
+      projectName: localProject?.projectName ?? '',
+      requestedGranularity,
+      startDate,
+    });
+  }
+
+  try {
+    const supabase = getSupabase();
+    const importedProjects = await loadImportedProjectRows();
+    const project = orgId
+      ? importedProjects.find((item) => item.code === orgId)
+      : importedProjects[0];
+
+    if (project) {
+      const { data, error } = await supabase
+        .from('energy_metrics')
+        .select('metric_at, energy_type, source, usage_kwh, metadata')
+        .eq('project_id', project.id)
+        .eq('energy_type', meterType)
+        .order('metric_at', { ascending: false })
+        .order('usage_kwh', { ascending: false });
+
+      if (error) {
+        throw error;
+      }
+
+      const filteredRows = ((data ?? []) as ImportedEnergyMetricRow[])
+        .filter(
+          (row) => normalizeStringValue(row.metadata?.importSource) === 'energy-report-import',
+        )
+        .map((row) => toImportedEnergyQueryRow(row, project))
+        .filter(
+          (row) =>
+            (!startDate || row.sample_date >= startDate) &&
+            (!endDate || row.sample_date <= endDate),
+        )
+        .filter((row) => matchesImportedEnergyQuery(row, payload.queryName));
+
+      return buildImportedEnergyReportResponse(filteredRows, {
+        endDate,
+        meterType,
+        orgId: project.code,
+        pageNum,
+        pageSize,
+        projectName: project.name,
+        requestedGranularity,
+        startDate,
+      });
+    }
+  } catch {
+    // Fall back to local imported data when Supabase schema is unavailable.
+  }
+  const localProject = orgId
+    ? localData?.projects.find((project) => project.orgId === orgId)
+    : localData?.projects[0];
+  const scopedLocalRows =
+    orgId && !localProject
+      ? []
+      : (localData?.records ?? []).filter(
+          (row) => !localProject || row.org_id === localProject.orgId,
+        );
+  const filteredRows = scopedLocalRows
+    .filter((row) => row.meter_type === meterType)
+    .filter(
+      (row) => (!startDate || row.sample_date >= startDate) && (!endDate || row.sample_date <= endDate),
+    )
+    .filter((row) => matchesImportedEnergyQuery(row, payload.queryName));
+
+  return buildImportedEnergyReportResponse(filteredRows, {
+    endDate,
+    meterType,
+    orgId: localProject?.orgId ?? orgId,
+    pageNum,
+    pageSize,
+    projectName: localProject?.projectName ?? '',
+    requestedGranularity,
+    startDate,
+  });
 };
 
 export const listIntegrations = async (projectCode?: string) => {
