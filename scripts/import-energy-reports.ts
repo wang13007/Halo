@@ -1,11 +1,13 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { createClient } from '@supabase/supabase-js';
-import XLSX from 'xlsx';
-import { env } from '../server/config.js';
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+import { createClient } from "@supabase/supabase-js";
+import XLSX from "xlsx";
+import { env } from "../server/config.js";
 
 type ParsedEnergyProject = {
+  availableGranularities: string[];
+  availableMeterTypes: string[];
   code: string;
   firstSampleDate: string;
   lastSampleDate: string;
@@ -26,26 +28,33 @@ type ParsedEnergyRecord = {
   usageKwh: number;
 };
 
-const defaultDesktopDirectory = '\\\\Mac\\Home\\Desktop';
-const defaultFileSuffixes = ['20260326090129.xlsx', '20260326090143.xlsx'];
+const defaultDesktopDirectory = "\\\\Mac\\Home\\Desktop";
+const defaultFileSuffixes = ["20260326090129.xlsx", "20260326090143.xlsx"];
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
-const projectRoot = path.resolve(currentDir, '..');
-const localCacheFilePath = path.join(projectRoot, 'server', 'data', 'imported-energy-data.json');
+const projectRoot = path.resolve(currentDir, "..");
+const localCacheFilePath = path.join(
+  projectRoot,
+  "server",
+  "data",
+  "imported-energy-data.json",
+);
+const defaultGranularities = ["day"];
+const defaultMeterTypes = ["electricity"];
 
 const normalizeText = (value: unknown) => {
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return value.trim();
   }
 
-  if (typeof value === 'number' && Number.isFinite(value)) {
+  if (typeof value === "number" && Number.isFinite(value)) {
     return String(value);
   }
 
-  return '';
+  return "";
 };
 
 const toUsageNumber = (value: unknown) => {
-  const normalized = normalizeText(value).replace(/,/g, '');
+  const normalized = normalizeText(value).replace(/,/g, "");
 
   if (!normalized) {
     return null;
@@ -57,7 +66,7 @@ const toUsageNumber = (value: unknown) => {
 
 const normalizeDateHeader = (value: unknown) => {
   const normalized = normalizeText(value);
-  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : '';
+  return /^\d{4}-\d{2}-\d{2}$/.test(normalized) ? normalized : "";
 };
 
 const resolveInputFiles = (inputArgs: string[]) => {
@@ -76,7 +85,9 @@ const resolveInputFiles = (inputArgs: string[]) => {
 
   return fs
     .readdirSync(defaultDesktopDirectory)
-    .filter((fileName) => defaultFileSuffixes.some((suffix) => fileName.endsWith(suffix)))
+    .filter((fileName) =>
+      defaultFileSuffixes.some((suffix) => fileName.endsWith(suffix)),
+    )
     .sort()
     .map((fileName) => path.join(defaultDesktopDirectory, fileName));
 };
@@ -90,11 +101,14 @@ const parseWorkbook = (filePath: string) => {
   }
 
   const worksheet = workbook.Sheets[firstSheetName];
-  const rows = XLSX.utils.sheet_to_json<Array<string | number | null>>(worksheet, {
-    defval: null,
-    header: 1,
-    raw: false,
-  });
+  const rows = XLSX.utils.sheet_to_json<Array<string | number | null>>(
+    worksheet,
+    {
+      defval: null,
+      header: 1,
+      raw: false,
+    },
+  );
 
   const [headerRow = [], ...dataRows] = rows;
 
@@ -131,9 +145,11 @@ const parseWorkbook = (filePath: string) => {
     }
 
     const projectEntry = projects.get(projectCode) ?? {
+      availableGranularities: [...defaultGranularities],
+      availableMeterTypes: [...defaultMeterTypes],
       code: projectCode,
-      firstSampleDate: dateColumns[0]?.sampleDate ?? '',
-      lastSampleDate: dateColumns.at(-1)?.sampleDate ?? '',
+      firstSampleDate: dateColumns[0]?.sampleDate ?? "",
+      lastSampleDate: dateColumns.at(-1)?.sampleDate ?? "",
       name: projectName,
       organizationPath,
       recordCount: 0,
@@ -149,7 +165,7 @@ const parseWorkbook = (filePath: string) => {
       projectEntry.recordCount += 1;
 
       records.push({
-        energyPath: energyPath || 'Uncategorized',
+        energyPath: energyPath || "Uncategorized",
         meterName: meterName || `Meter ${rowIndex + 1}`,
         meterNumber,
         organizationPath,
@@ -177,7 +193,9 @@ const run = async () => {
   const inputFiles = resolveInputFiles(process.argv.slice(2));
 
   if (inputFiles.length === 0) {
-    throw new Error('No Excel files found. Pass file paths or place the exports on the desktop.');
+    throw new Error(
+      "No Excel files found. Pass file paths or place the exports on the desktop.",
+    );
   }
 
   inputFiles.forEach((filePath) => {
@@ -194,7 +212,9 @@ const run = async () => {
   });
 
   if (allRecords.length === 0) {
-    throw new Error('No energy rows were parsed from the provided Excel files.');
+    throw new Error(
+      "No energy rows were parsed from the provided Excel files.",
+    );
   }
 
   fs.mkdirSync(path.dirname(localCacheFilePath), { recursive: true });
@@ -204,6 +224,8 @@ const run = async () => {
       {
         generatedAt: new Date().toISOString(),
         projects: [...allProjects.values()].map((project) => ({
+          availableGranularities: project.availableGranularities,
+          availableMeterTypes: project.availableMeterTypes,
           firstSampleDate: project.firstSampleDate,
           lastSampleDate: project.lastSampleDate,
           orgId: project.code,
@@ -214,12 +236,12 @@ const run = async () => {
         })),
         records: allRecords.map((record) => ({
           energy_path: record.energyPath,
-          granularity: 'day',
+          granularity: "day",
           meter_name: record.meterName,
           meter_number: record.meterNumber,
-          meter_type: 'electricity',
+          meter_type: "electricity",
           metadata: {
-            importSource: 'energy-report-import',
+            importSource: "energy-report-import",
             sourceFile: record.sourceFile,
           },
           org_id: record.projectCode,
@@ -262,35 +284,37 @@ const run = async () => {
 
   const projectUpserts = [...allProjects.values()].map((project) => ({
     code: project.code,
-    location: 'Shanghai',
+    location: "Shanghai",
     metadata: {
+      availableGranularities: project.availableGranularities,
+      availableMeterTypes: project.availableMeterTypes,
       firstSampleDate: project.firstSampleDate,
       lastSampleDate: project.lastSampleDate,
       organizationPath: project.organizationPath,
       recordCount: project.recordCount,
-      source: 'energy-report-import',
+      source: "energy-report-import",
     },
     name: project.name,
-    timezone: 'Asia/Shanghai',
+    timezone: "Asia/Shanghai",
   }));
 
   let supabaseImported = true;
-  let supabaseError = '';
+  let supabaseError = "";
 
   try {
     const { error: projectUpsertError } = await supabase
-      .from('projects')
-      .upsert(projectUpserts, { onConflict: 'code' });
+      .from("projects")
+      .upsert(projectUpserts, { onConflict: "code" });
 
     if (projectUpsertError) {
       throw new Error(projectUpsertError.message);
     }
 
     const { data: projectRows, error: projectSelectError } = await supabase
-      .from('projects')
-      .select('id, code')
+      .from("projects")
+      .select("id, code")
       .in(
-        'code',
+        "code",
         [...allProjects.values()].map((project) => project.code),
       );
 
@@ -317,11 +341,11 @@ const run = async () => {
           {
             carbon_kg: 0,
             cost_amount: 0,
-            energy_type: 'electricity',
+            energy_type: "electricity",
             metadata: {
               energyPath: record.energyPath,
-              granularity: 'day',
-              importSource: 'energy-report-import',
+              granularity: "day",
+              importSource: "energy-report-import",
               meterName: record.meterName,
               meterNumber: record.meterNumber,
               organizationPath: record.organizationPath,
@@ -329,7 +353,7 @@ const run = async () => {
               projectName: record.projectName,
               sampleDate: record.sampleDate,
               sourceFile: record.sourceFile,
-              unit: 'kWh',
+              unit: "kWh",
             },
             metric_at: metricAtFromSampleDate(record.sampleDate),
             project_id: projectId,
@@ -348,13 +372,13 @@ const run = async () => {
         return [
           {
             energy_path: record.energyPath,
-            granularity: 'day',
+            granularity: "day",
             meter_name: record.meterName,
             meter_number: record.meterNumber,
-            meter_type: 'electricity',
+            meter_type: "electricity",
             metadata: {
-              importSource: 'energy-report-import',
-              unit: 'kWh',
+              importSource: "energy-report-import",
+              unit: "kWh",
             },
             org_id: record.projectCode,
             organization_path: record.organizationPath,
@@ -369,9 +393,9 @@ const run = async () => {
       });
 
       const { error: metricUpsertError } = await supabase
-        .from('energy_metrics')
+        .from("energy_metrics")
         .upsert(metricRows, {
-          onConflict: 'project_id,metric_at,energy_type,source',
+          onConflict: "project_id,metric_at,energy_type,source",
         });
 
       if (metricUpsertError) {
@@ -379,9 +403,10 @@ const run = async () => {
       }
 
       const { error: queryRecordUpsertError } = await supabase
-        .from('energy_query_records')
+        .from("energy_query_records")
         .upsert(queryRecordRows, {
-          onConflict: 'project_id,meter_number,sample_date,granularity,meter_type',
+          onConflict:
+            "project_id,meter_number,sample_date,granularity,meter_type",
         });
 
       if (queryRecordUpsertError) {
@@ -390,21 +415,22 @@ const run = async () => {
     }
   } catch (error) {
     supabaseImported = false;
-    supabaseError = error instanceof Error ? error.message : 'Unknown Supabase import error';
+    supabaseError =
+      error instanceof Error ? error.message : "Unknown Supabase import error";
   }
 
   console.log(
     JSON.stringify(
-        {
-          files: inputFiles.map((filePath) => path.basename(filePath)),
-          localCacheFile: localCacheFilePath,
-          projects: [...allProjects.values()].map((project) => project.name),
-          recordCount: allRecords.length,
-          supabaseError,
-          supabaseImported,
-        },
-        null,
-        2,
+      {
+        files: inputFiles.map((filePath) => path.basename(filePath)),
+        localCacheFile: localCacheFilePath,
+        projects: [...allProjects.values()].map((project) => project.name),
+        recordCount: allRecords.length,
+        supabaseError,
+        supabaseImported,
+      },
+      null,
+      2,
     ),
   );
 };

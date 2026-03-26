@@ -48,10 +48,90 @@ type WidgetBodyProps = {
   widget: DashboardWidget;
 };
 
+type WidgetScale = {
+  bodyGapClassName: string;
+  chipPaddingClassName: string;
+  chipTextClassName: string;
+  donutInsetClassName: string;
+  donutLabelClassName: string;
+  donutValueClassName: string;
+  donutWrapClassName: string;
+  eyebrowClassName: string;
+  iconBoxClassName: string;
+  iconSize: number;
+  majorMetricClassName: string;
+  mediumMetricClassName: string;
+  minorMetricClassName: string;
+  panelPaddingClassName: string;
+  sectionGapClassName: string;
+  titleClassName: string;
+  unitClassName: string;
+};
+
 const sizeButtonOptions: WidgetSize[] = ['1:1', '2:1', '2:2'];
 
 const dashboardGridClassName =
   'grid grid-cols-1 gap-5 md:auto-rows-[220px] md:grid-cols-6 xl:grid-cols-12';
+
+const widgetScaleMap: Record<WidgetSize, WidgetScale> = {
+  '1:1': {
+    bodyGapClassName: 'gap-5',
+    chipPaddingClassName: 'px-3.5 py-3',
+    chipTextClassName: 'text-[13px] leading-5',
+    donutInsetClassName: 'inset-[14px]',
+    donutLabelClassName: 'text-[11px]',
+    donutValueClassName: 'text-[20px]',
+    donutWrapClassName: 'h-32 w-32',
+    eyebrowClassName: 'text-[10px] tracking-[0.14em]',
+    iconBoxClassName: 'h-9 w-9 rounded-[18px]',
+    iconSize: 17,
+    majorMetricClassName: 'text-[34px] sm:text-[38px]',
+    mediumMetricClassName: 'text-[28px] sm:text-[32px]',
+    minorMetricClassName: 'text-[18px]',
+    panelPaddingClassName: 'p-4',
+    sectionGapClassName: 'mt-5',
+    titleClassName: 'text-[14px] leading-5',
+    unitClassName: 'pb-1 text-sm',
+  },
+  '2:1': {
+    bodyGapClassName: 'gap-6',
+    chipPaddingClassName: 'px-4 py-3',
+    chipTextClassName: 'text-sm leading-6',
+    donutInsetClassName: 'inset-[16px]',
+    donutLabelClassName: 'text-xs',
+    donutValueClassName: 'text-[22px]',
+    donutWrapClassName: 'h-36 w-36',
+    eyebrowClassName: 'text-[11px] tracking-[0.16em]',
+    iconBoxClassName: 'h-10 w-10 rounded-[20px]',
+    iconSize: 18,
+    majorMetricClassName: 'text-[42px] sm:text-[50px] lg:text-[56px]',
+    mediumMetricClassName: 'text-[34px] sm:text-[40px]',
+    minorMetricClassName: 'text-[20px]',
+    panelPaddingClassName: 'p-5',
+    sectionGapClassName: 'mt-6',
+    titleClassName: 'text-[15px] leading-5',
+    unitClassName: 'pb-1.5 text-base sm:text-lg',
+  },
+  '2:2': {
+    bodyGapClassName: 'gap-7',
+    chipPaddingClassName: 'px-4 py-3.5',
+    chipTextClassName: 'text-sm leading-6',
+    donutInsetClassName: 'inset-[18px]',
+    donutLabelClassName: 'text-sm',
+    donutValueClassName: 'text-[24px]',
+    donutWrapClassName: 'h-40 w-40',
+    eyebrowClassName: 'text-[11px] tracking-[0.18em]',
+    iconBoxClassName: 'h-11 w-11 rounded-[20px]',
+    iconSize: 20,
+    majorMetricClassName: 'text-[48px] sm:text-[56px] lg:text-[64px]',
+    mediumMetricClassName: 'text-[36px] sm:text-[42px]',
+    minorMetricClassName: 'text-[22px]',
+    panelPaddingClassName: 'p-6',
+    sectionGapClassName: 'mt-8',
+    titleClassName: 'text-[16px] leading-6',
+    unitClassName: 'pb-2 text-lg sm:text-xl',
+  },
+};
 
 const widgetMobileHeightClassMap: Record<WidgetSize, string> = {
   '1:1': 'min-h-[320px]',
@@ -112,6 +192,8 @@ const clampTextStyle = (lines: number): CSSProperties =>
         display: '-webkit-box',
         overflow: 'hidden',
       };
+
+const getWidgetScale = (size: WidgetSize) => widgetScaleMap[size];
 
 const isDragPayload = (value: unknown): value is DragPayload => {
   if (!value || typeof value !== 'object') {
@@ -194,15 +276,70 @@ const RatioPreview = ({ isDarkMode, size }: { isDarkMode: boolean; size: WidgetS
   );
 };
 
+const WidgetHeader = ({
+  icon: Icon,
+  iconSurfaceClassName,
+  size,
+  subtitle,
+  theme,
+  title,
+  trailing,
+}: {
+  icon: LucideIcon;
+  iconSurfaceClassName: string;
+  size: WidgetSize;
+  subtitle?: string;
+  theme: WidgetTheme;
+  title: string;
+  trailing?: React.ReactNode;
+}) => {
+  const scale = getWidgetScale(size);
+
+  return (
+    <div className="flex items-start justify-between gap-3">
+      <div className="flex min-w-0 items-start gap-3">
+        <span
+          className={`inline-flex shrink-0 items-center justify-center ${scale.iconBoxClassName} ${iconSurfaceClassName}`}
+        >
+          <Icon size={scale.iconSize} />
+        </span>
+
+        <div className="min-w-0">
+          <div
+            className={`${scale.titleClassName} font-semibold ${theme.textSecondary}`}
+            style={clampTextStyle(size === '1:1' ? 2 : 1)}
+          >
+            {title}
+          </div>
+
+          {subtitle && (
+            <div
+              className={`mt-1 font-semibold uppercase ${scale.eyebrowClassName} ${theme.textMuted}`}
+              style={clampTextStyle(1)}
+            >
+              {subtitle}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {trailing ? <div className="shrink-0">{trailing}</div> : null}
+    </div>
+  );
+};
+
 const DonutGauge = ({
   isDarkMode,
   label,
   percentage,
+  size,
 }: {
   isDarkMode: boolean;
   label: string;
   percentage: number;
+  size?: WidgetSize;
 }) => {
+  const scale = getWidgetScale(size ?? '2:1');
   const angle = percentage * 3.6;
   const ringStyle: CSSProperties = {
     background: `conic-gradient(#18b7d4 0deg ${angle}deg, ${
@@ -211,17 +348,23 @@ const DonutGauge = ({
   };
 
   return (
-    <div className="relative mx-auto h-40 w-40">
+    <div className={`relative mx-auto ${scale.donutWrapClassName}`}>
       <div className="absolute inset-0 rounded-full" style={ringStyle} />
       <div
-        className="absolute inset-[18px] rounded-full"
+        className={`absolute ${scale.donutInsetClassName} rounded-full`}
         style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}
       />
       <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-        <div className={`text-[22px] font-black leading-none ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+        <div
+          className={`${scale.donutValueClassName} font-black leading-none ${
+            isDarkMode ? 'text-slate-100' : 'text-slate-900'
+          }`}
+        >
           {percentage}%
         </div>
-        <div className={`mt-1 text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{label}</div>
+        <div className={`mt-1 ${scale.donutLabelClassName} ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+          {label}
+        </div>
       </div>
     </div>
   );
@@ -247,42 +390,43 @@ const WidgetToolbar = ({ theme, onRemove }: { theme: WidgetTheme; onRemove?: () 
 
 const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
   const isSquare = widget.size === '1:1';
-  const isTall = widget.size === '2:2';
+  const scale = getWidgetScale(widget.size);
+  const sparkBarClassName =
+    widget.size === '1:1' ? 'h-14 w-2' : widget.size === '2:2' ? 'h-20 w-3' : 'h-16 w-2.5';
 
   return (
     <div className="flex h-full flex-col">
       <div className={`flex ${isSquare ? 'flex-col items-start gap-4' : 'items-start justify-between gap-4'}`}>
-        <div className="inline-flex items-center gap-3">
-          <span
-            className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${
-              isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
-            }`}
-          >
-            <Bolt size={20} />
-          </span>
-          <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+        <div className="min-w-0 flex-1">
+          <WidgetHeader
+            icon={Bolt}
+            iconSurfaceClassName={isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'}
+            size={widget.size}
+            theme={theme}
+            title={widget.title}
+          />
         </div>
 
-        <div className="relative overflow-hidden rounded-[26px] border px-5 py-4 pr-8 sm:min-w-[160px]">
+        <div
+          className={`relative w-full overflow-hidden rounded-[26px] border pr-8 ${theme.line} ${scale.panelPaddingClassName} ${
+            isSquare ? '' : 'sm:min-w-[168px] sm:max-w-[220px]'
+          }`}
+        >
           <div className="absolute -right-4 -top-3 h-24 w-24 rounded-[28px] bg-cyan-300/20" />
           <div className={`relative text-sm ${theme.textMuted}`}>峰值负荷</div>
-          <div className="relative mt-2 text-[18px] font-black text-cyan-600">
+          <div className={`relative mt-2 font-black text-cyan-600 ${scale.minorMetricClassName}`}>
             5,240
-            <span className={`ml-1 text-base font-semibold ${theme.textSecondary}`}>kW</span>
+            <span className={`ml-1 text-sm font-semibold ${theme.textSecondary}`}>kW</span>
           </div>
         </div>
       </div>
 
-      <div className="mt-8 flex flex-1 flex-col justify-between gap-6">
-        <div className="flex items-end gap-3">
-          <div
-            className={`font-black leading-none tracking-[-0.06em] ${theme.textPrimary} ${
-              isSquare ? 'text-[46px]' : isTall ? 'text-[58px] md:text-[74px]' : 'text-[54px] md:text-[72px]'
-            }`}
-          >
+      <div className={`${scale.sectionGapClassName} flex flex-1 flex-col justify-between ${scale.bodyGapClassName}`}>
+        <div className="flex flex-wrap items-end gap-x-3 gap-y-2">
+          <div className={`font-black leading-none tracking-[-0.06em] ${scale.majorMetricClassName} ${theme.textPrimary}`}>
             42,850.4
           </div>
-          <div className={`pb-2 text-[22px] ${theme.textMuted}`}>kWh</div>
+          <div className={`${scale.unitClassName} ${theme.textMuted}`}>kWh</div>
         </div>
 
         <div
@@ -304,7 +448,7 @@ const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
             {energySparkBars.map((height, index) => (
               <span
                 key={`energy-bar-${index}`}
-                className={`relative flex h-16 w-2.5 items-end overflow-hidden rounded-full ${theme.trackSurface}`}
+                className={`relative flex items-end overflow-hidden rounded-full ${sparkBarClassName} ${theme.trackSurface}`}
               >
                 <span
                   className={`w-full rounded-full ${
@@ -323,31 +467,28 @@ const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
 
 const PowerCompositionCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
   const isSquare = widget.size === '1:1';
+  const scale = getWidgetScale(widget.size);
 
   return (
     <div className="flex h-full flex-col">
-      <div className="inline-flex items-center gap-3">
-        <span
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
-            isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
-          }`}
-        >
-          <BarChart3 size={18} />
-        </span>
-        <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
-      </div>
+      <WidgetHeader
+        icon={BarChart3}
+        iconSurfaceClassName={isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'}
+        size={widget.size}
+        theme={theme}
+        title={widget.title}
+      />
+      <div className={`${scale.sectionGapClassName} flex flex-1 flex-col ${isSquare ? '' : 'justify-center'}`}>
+        <DonutGauge isDarkMode={isDarkMode} label="租户用电" percentage={60} size={widget.size} />
 
-      <div className={`mt-6 flex flex-1 flex-col ${isSquare ? '' : 'justify-center'}`}>
-        <DonutGauge isDarkMode={isDarkMode} label="租户用电" percentage={60} />
-
-        <div className="mt-6 space-y-3">
+        <div className={`${widget.size === '1:1' ? 'mt-5' : 'mt-6'} space-y-3`}>
           {powerCompositionData.map((item) => (
             <div key={item.label} className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-3">
                 <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
-                <span className={`text-[15px] ${theme.textSecondary}`}>{item.label}</span>
+                <span className={`${scale.titleClassName} ${theme.textSecondary}`}>{item.label}</span>
               </div>
-              <span className={`text-[15px] font-semibold ${theme.textPrimary}`}>{item.value}%</span>
+              <span className={`${scale.titleClassName} font-semibold ${theme.textPrimary}`}>{item.value}%</span>
             </div>
           ))}
         </div>
@@ -360,38 +501,60 @@ const SolarPowerCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
   <div className="flex h-full flex-col">
     <div className="absolute inset-x-0 top-0 h-1.5 bg-cyan-500" />
 
-    <div className="flex items-start justify-between gap-3">
-      <div className="inline-flex items-center gap-3">
+    <WidgetHeader
+      icon={SunMedium}
+      iconSurfaceClassName={isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'}
+      size={widget.size}
+      theme={theme}
+      title={widget.title}
+      trailing={
         <span
-          className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
-            isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
-          }`}
+          className={`rounded-xl font-bold uppercase ${
+            widget.size === '1:1' ? 'px-2.5 py-1 text-[10px] tracking-[0.14em]' : 'px-3 py-1 text-xs tracking-[0.08em]'
+          } ${isDarkMode ? 'bg-cyan-500/14 text-cyan-100' : 'bg-cyan-50 text-cyan-700'}`}
         >
-          <SunMedium size={18} />
+          ACTIVE
         </span>
-        <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
-      </div>
-
-      <span
-        className={`rounded-xl px-3 py-1 text-xs font-bold tracking-[0.08em] ${
-          isDarkMode ? 'bg-cyan-500/14 text-cyan-100' : 'bg-cyan-50 text-cyan-700'
-        }`}
-      >
-        ACTIVE
-      </span>
-    </div>
+      }
+    />
 
     <div className={`mt-8 text-sm ${theme.textMuted}`}>当前实时功率</div>
-    <div className="mt-3 flex items-end gap-2">
-      <div className={`text-[46px] font-black leading-none tracking-[-0.05em] ${theme.textPrimary}`}>1,248.5</div>
-      <div className={`pb-2 text-[20px] ${theme.textMuted}`}>kW</div>
+    <div className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-1">
+      <div
+        className={`font-black leading-none tracking-[-0.05em] ${theme.textPrimary} ${
+          widget.size === '1:1'
+            ? 'text-[28px] sm:text-[32px]'
+            : widget.size === '2:2'
+              ? 'text-[36px] sm:text-[42px]'
+              : 'text-[34px] sm:text-[40px]'
+        }`}
+      >
+        1,248.5
+      </div>
+      <div
+        className={`${
+          widget.size === '1:1' ? 'pb-1 text-sm' : widget.size === '2:2' ? 'pb-2 text-lg sm:text-xl' : 'pb-1.5 text-base'
+        } ${theme.textMuted}`}
+      >
+        kW
+      </div>
     </div>
 
-    <div className={`mt-auto rounded-[24px] p-5 ${theme.panelSurface}`}>
+    <div
+      className={`mt-auto rounded-[24px] ${
+        widget.size === '1:1' ? 'p-4' : widget.size === '2:2' ? 'p-6' : 'p-5'
+      } ${theme.panelSurface}`}
+    >
       <div className={`text-sm ${theme.textMuted}`}>今日累计发电</div>
       <div className="mt-3 flex items-end justify-between gap-3">
-        <div className="text-[20px] font-black text-cyan-500">8,450 kWh</div>
-        <SunMedium size={28} className="text-cyan-300" />
+        <div
+          className={`font-black text-cyan-500 ${
+            widget.size === '1:1' ? 'text-[18px]' : widget.size === '2:2' ? 'text-[22px]' : 'text-[20px]'
+          }`}
+        >
+          8,450 kWh
+        </div>
+        <SunMedium size={widget.size === '1:1' ? 22 : widget.size === '2:2' ? 28 : 24} className="shrink-0 text-cyan-300" />
       </div>
     </div>
   </div>
@@ -399,23 +562,32 @@ const SolarPowerCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
 
 const SystemRankingCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
   <div className="flex h-full flex-col">
-    <div className="inline-flex items-center gap-3">
-      <span
-        className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
-          isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
-        }`}
-      >
-        <ListTodo size={18} />
-      </span>
-      <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
-    </div>
+    <WidgetHeader
+      icon={ListTodo}
+      iconSurfaceClassName={isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'}
+      size={widget.size}
+      theme={theme}
+      title={widget.title}
+    />
 
-    <div className="mt-8 space-y-6">
+    <div className={`${widget.size === '1:1' ? 'mt-5 space-y-4' : widget.size === '2:2' ? 'mt-8 space-y-6' : 'mt-6 space-y-5'}`}>
       {systemRankingData.map((item) => (
         <div key={item.label}>
           <div className="flex items-center justify-between gap-3">
-            <span className={`text-[15px] ${theme.textPrimary}`}>{item.label}</span>
-            <span className={`text-[15px] font-semibold ${theme.textSecondary}`}>{item.value}%</span>
+            <span
+              className={`min-w-0 ${
+                widget.size === '1:1' ? 'text-[14px]' : widget.size === '2:2' ? 'text-base' : 'text-[15px]'
+              } ${theme.textPrimary}`}
+            >
+              {item.label}
+            </span>
+            <span
+              className={`shrink-0 font-semibold ${
+                widget.size === '1:1' ? 'text-[14px]' : widget.size === '2:2' ? 'text-base' : 'text-[15px]'
+              } ${theme.textSecondary}`}
+            >
+              {item.value}%
+            </span>
           </div>
           <div className={`mt-3 h-2.5 rounded-full ${theme.trackSurface}`}>
             <div className="h-full rounded-full bg-cyan-500" style={{ width: `${item.value}%` }} />
@@ -428,40 +600,46 @@ const SystemRankingCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
 
 const MultiEnergyCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
   const chartHeightClass =
-    widget.size === '1:1' ? 'h-36' : widget.size === '2:2' ? 'h-64' : 'h-44';
+    widget.size === '1:1' ? 'h-32' : widget.size === '2:2' ? 'h-56' : 'h-40';
+  const barWidthClassName = widget.size === '2:2' ? 'w-4 sm:w-5' : 'w-3 sm:w-4';
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-        <div className="inline-flex items-center gap-3">
-          <span
-            className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${
-              isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
-            }`}
-          >
-            <BarChart3 size={20} />
-          </span>
-          <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+        <div className="min-w-0 flex-1">
+          <WidgetHeader
+            icon={BarChart3}
+            iconSurfaceClassName={isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'}
+            size={widget.size}
+            theme={theme}
+            title={widget.title}
+          />
         </div>
 
-        <div className="flex flex-wrap items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3 sm:justify-end">
           {multiEnergyLegend.map((legend) => (
             <div key={legend.key} className="flex items-center gap-2">
               <span className="h-3 w-3 rounded-full" style={{ backgroundColor: legend.color }} />
-              <span className={`text-sm ${theme.textSecondary}`}>{legend.label}</span>
+              <span className={`${widget.size === '1:1' ? 'text-[12px]' : 'text-sm'} ${theme.textSecondary}`}>
+                {legend.label}
+              </span>
             </div>
           ))}
         </div>
       </div>
 
-      <div className={`mt-8 flex flex-1 items-end gap-3 border-b pb-4 ${theme.line} ${chartHeightClass}`}>
+      <div
+        className={`${
+          widget.size === '1:1' ? 'mt-5' : widget.size === '2:2' ? 'mt-8' : 'mt-6'
+        } flex flex-1 items-end gap-3 border-b pb-4 ${theme.line} ${chartHeightClass}`}
+      >
         {multiEnergySeries.map((item) => (
-          <div key={item.time} className="flex flex-1 flex-col items-center justify-end gap-3">
+          <div key={item.time} className="flex flex-1 flex-col items-center justify-end gap-2.5">
             <div className="flex h-full items-end gap-1.5">
               {multiEnergyLegend.map((legend) => (
                 <div
                   key={`${item.time}-${legend.key}`}
-                  className="w-4 rounded-t-[4px] sm:w-5"
+                  className={`${barWidthClassName} rounded-t-[4px]`}
                   style={{
                     backgroundColor: legend.color,
                     height: `${item[legend.key]}%`,
@@ -479,24 +657,41 @@ const MultiEnergyCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
 
 const CarbonMonitorCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
   <div className="flex h-full flex-col">
-    <div className="inline-flex items-center gap-3">
-      <span
-        className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
-          isDarkMode ? 'bg-emerald-500/12 text-emerald-200' : 'bg-emerald-50 text-emerald-700'
-        }`}
-      >
-        <Leaf size={18} />
-      </span>
-      <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
-    </div>
+    <WidgetHeader
+      icon={Leaf}
+      iconSurfaceClassName={isDarkMode ? 'bg-emerald-500/12 text-emerald-200' : 'bg-emerald-50 text-emerald-700'}
+      size={widget.size}
+      theme={theme}
+      title={widget.title}
+    />
 
     <div className={`mt-8 text-sm ${theme.textMuted}`}>今日碳减排量</div>
-    <div className="mt-3 flex items-end gap-2">
-      <div className={`text-[54px] font-black leading-none tracking-[-0.05em] ${theme.textPrimary}`}>24.8</div>
-      <div className={`pb-2 text-[20px] ${theme.textMuted}`}>tCO2e</div>
+    <div className="mt-3 flex flex-wrap items-end gap-x-2 gap-y-1">
+      <div
+        className={`font-black leading-none tracking-[-0.05em] ${theme.textPrimary} ${
+          widget.size === '1:1'
+            ? 'text-[30px] sm:text-[34px]'
+            : widget.size === '2:2'
+              ? 'text-[38px] sm:text-[44px]'
+              : 'text-[34px] sm:text-[40px]'
+        }`}
+      >
+        24.8
+      </div>
+      <div
+        className={`${
+          widget.size === '1:1' ? 'pb-1 text-sm' : widget.size === '2:2' ? 'pb-2 text-lg sm:text-xl' : 'pb-1.5 text-base'
+        } ${theme.textMuted}`}
+      >
+        tCO2e
+      </div>
     </div>
 
-    <div className={`mt-auto rounded-[24px] p-5 ${theme.panelSurface}`}>
+    <div
+      className={`mt-auto rounded-[24px] ${
+        widget.size === '1:1' ? 'p-4' : widget.size === '2:2' ? 'p-6' : 'p-5'
+      } ${theme.panelSurface}`}
+    >
       <div className="flex items-center justify-between gap-3">
         <div className={`text-sm ${theme.textMuted}`}>本月目标进度</div>
         <div className="text-sm font-bold text-cyan-600">68%</div>
@@ -513,14 +708,22 @@ const CarbonMonitorCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
 
 const GenericInsightCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
   const Icon = getWidgetIcon(widget);
+  const scale = getWidgetScale(widget.size);
   const visibleItems = widget.items.slice(0, widget.size === '1:1' ? 3 : 4);
 
   return (
     <div className="relative flex h-full flex-col">
       <div className={`absolute inset-x-0 top-0 h-1.5 rounded-t-[28px] bg-gradient-to-r ${widget.accent}`} />
 
-      <div className="flex items-start justify-between gap-3">
-        <div className="inline-flex items-center gap-3">
+      <WidgetHeader
+        icon={Icon}
+        iconSurfaceClassName={isDarkMode ? 'bg-blue-500/12 text-blue-200' : 'bg-blue-50 text-blue-700'}
+        size={widget.size}
+        subtitle={widget.category === 'custom' ? 'AI 瀹氬埗' : '绯荤粺鍗＄墖'}
+        theme={theme}
+        title={widget.title}
+      />
+      {/*
           <span
             className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${
               isDarkMode ? 'bg-blue-500/12 text-blue-200' : 'bg-blue-50 text-blue-700'
@@ -537,29 +740,37 @@ const GenericInsightCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
         </div>
       </div>
 
-      <div className={`mt-8 text-[44px] font-black leading-none tracking-[-0.05em] ${theme.textPrimary}`}>
+      */}
+      <div className={`${scale.sectionGapClassName} ${scale.mediumMetricClassName} font-black leading-none tracking-[-0.05em] ${theme.textPrimary}`}>
         {widget.value}
       </div>
 
       <p
-        className={`mt-4 text-sm leading-6 ${theme.textSecondary}`}
+        className={`mt-4 ${widget.size === '1:1' ? 'text-[13px] leading-5' : 'text-sm leading-6'} ${theme.textSecondary}`}
         style={clampTextStyle(widget.size === '1:1' ? 2 : 3)}
       >
         {widget.helper}
       </p>
 
       <p
-        className={`mt-3 text-sm leading-6 ${theme.textMuted}`}
+        className={`mt-3 ${widget.size === '1:1' ? 'text-[13px] leading-5' : 'text-sm leading-6'} ${theme.textMuted}`}
         style={clampTextStyle(widget.size === '1:1' ? 3 : 4)}
       >
         {widget.description}
       </p>
 
-      <div className="mt-auto space-y-3 pt-6">
+      <div className={`mt-auto ${widget.size === '1:1' ? 'space-y-2.5' : 'space-y-3'} pt-6`}>
         {visibleItems.map((item) => (
-          <div key={item} className={`flex items-start gap-3 rounded-[18px] border px-4 py-3 ${theme.chipSurface}`}>
-            <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-500" />
-            <span className={`text-sm leading-6 ${theme.textSecondary}`}>{item}</span>
+          <div
+            key={item}
+            className={`flex items-start gap-3 rounded-[18px] border ${scale.chipPaddingClassName} ${theme.chipSurface}`}
+          >
+            <span
+              className={`mt-1 shrink-0 rounded-full bg-cyan-500 ${
+                widget.size === '1:1' ? 'h-2 w-2' : 'h-2.5 w-2.5'
+              }`}
+            />
+            <span className={`${scale.chipTextClassName} ${theme.textSecondary}`}>{item}</span>
           </div>
         ))}
       </div>
@@ -602,15 +813,21 @@ const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
   widget,
 }) => {
   const theme = getWidgetTheme(isDarkMode);
+  const framePaddingClassName =
+    widget.size === '1:1' ? 'p-5 sm:p-6' : widget.size === '2:2' ? 'p-6 sm:p-7' : 'p-5 sm:p-6';
 
   return (
     <article
-      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative overflow-hidden rounded-[30px] border transition duration-300 md:h-full md:min-h-0 ${
+      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[30px] border transition duration-300 md:h-full md:min-h-0 ${
         mode === 'board' ? 'hover:-translate-y-1 hover:shadow-[0_36px_90px_-56px_rgba(15,23,42,0.34)]' : ''
       } ${highlight ? 'ring-2 ring-cyan-400/55' : ''} ${theme.cardSurface}`}
     >
       {mode === 'preview' && <WidgetToolbar theme={theme} onRemove={onRemove} />}
-      <div className={`relative flex h-full flex-col p-6 sm:p-7 ${mode === 'preview' ? 'pr-24' : ''}`}>
+      <div
+        className={`relative flex h-full min-w-0 flex-col ${framePaddingClassName} ${
+          mode === 'preview' ? 'pr-20 sm:pr-24' : ''
+        }`}
+      >
         {renderWidgetBody({ isDarkMode, theme, widget })}
       </div>
     </article>

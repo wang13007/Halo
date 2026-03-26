@@ -1,21 +1,8 @@
-import {
-  endOfDay,
-  endOfHour,
-  endOfMonth,
-  endOfQuarter,
-  endOfWeek,
-  endOfYear,
-  format,
-  startOfDay,
-  startOfHour,
-  startOfMonth,
-  startOfQuarter,
-  startOfWeek,
-  startOfYear,
-} from 'date-fns';
-import { buildApiUrl, readApiBody } from './api';
+import { format } from "date-fns";
+import { buildApiUrl, readApiBody } from "./api";
 
 export type ChatQueryForm = {
+  endDate: string;
   energyType: string;
   interval: string;
   orgId: string;
@@ -23,7 +10,7 @@ export type ChatQueryForm = {
   pageSize: number;
   project: string;
   queryName: string;
-  timeRange: string;
+  startDate: string;
 };
 
 export type QueryReportProxyResponse = {
@@ -35,62 +22,28 @@ export type QueryReportProxyResponse = {
   upstreamUrl: string;
 };
 
-const energyTypeCodeMap: Record<string, string> = {
-  水: 'water',
-  电: 'electricity',
-  燃气: 'gas',
-};
-
 const queryTypeCodeMap: Record<string, number> = {
-  '1小时': 1,
-  '1天': 2,
+  day: 2,
+  hour: 1,
 };
 
-function resolveTimeRange(timeRange: string, now = new Date()) {
-  if (timeRange === '本周') {
-    return {
-      end: endOfWeek(now, { weekStartsOn: 1 }),
-      start: startOfWeek(now, { weekStartsOn: 1 }),
-    };
+const buildBoundaryTimestamp = (date: string, boundary: "start" | "end") => {
+  if (!date) {
+    return Date.now();
   }
 
-  if (timeRange === '本月') {
-    return {
-      end: endOfMonth(now),
-      start: startOfMonth(now),
-    };
-  }
-
-  if (timeRange === '本季') {
-    return {
-      end: endOfQuarter(now),
-      start: startOfQuarter(now),
-    };
-  }
-
-  if (timeRange === '本年') {
-    return {
-      end: endOfYear(now),
-      start: startOfYear(now),
-    };
-  }
-
-  return {
-    end: endOfDay(now),
-    start: startOfDay(now),
-  };
-}
+  const time = boundary === "start" ? "00:00:00.000" : "23:59:59.999";
+  return new Date(`${date}T${time}+08:00`).getTime();
+};
 
 export function buildEnergyQueryPayload(form: ChatQueryForm) {
-  const { end, start } = resolveTimeRange(form.timeRange);
-  const startAt = form.interval === '1小时' ? startOfHour(start).getTime() : start.getTime();
-  const endAt = form.interval === '1小时' ? endOfHour(end).getTime() : end.getTime();
-  const queryType = queryTypeCodeMap[form.interval] ?? 1;
-  const meterType = energyTypeCodeMap[form.energyType] ?? form.energyType;
+  const startAt = buildBoundaryTimestamp(form.startDate, "start");
+  const endAt = buildBoundaryTimestamp(form.endDate, "end");
+  const queryType = queryTypeCodeMap[form.interval] ?? 2;
 
   return {
     endTime: endAt,
-    meterType,
+    meterType: form.energyType,
     orgId: form.orgId,
     pageNum: form.pageNum,
     pageSize: form.pageSize,
@@ -104,29 +57,34 @@ export async function queryEnergyReport(
   payload: Record<string, unknown>,
   signal?: AbortSignal,
 ): Promise<QueryReportProxyResponse> {
-  const targetUrl = buildApiUrl('/api/energy/query-report');
+  const targetUrl = buildApiUrl("/api/energy/query-report");
   const response = await fetch(targetUrl, {
     body: JSON.stringify({ payload }),
     headers: {
-      'Content-Type': 'application/json',
+      "Content-Type": "application/json",
     },
-    method: 'POST',
+    method: "POST",
     signal,
   });
 
   try {
     const data = await readApiBody<QueryReportProxyResponse | string>(response);
 
-    if (data && typeof data === 'object' && 'ok' in data && 'upstreamStatus' in data) {
+    if (
+      data &&
+      typeof data === "object" &&
+      "ok" in data &&
+      "upstreamStatus" in data
+    ) {
       return data as QueryReportProxyResponse;
     }
 
     return {
       data,
       message:
-        typeof data === 'string'
+        typeof data === "string"
           ? data
-          : '代理接口返回的数据结构异常，请检查后端 query-report 代理。',
+          : "The query proxy returned an unexpected response payload.",
       ok: response.ok,
       requestPayload: payload,
       upstreamStatus: response.status,
@@ -137,7 +95,7 @@ export async function queryEnergyReport(
       message:
         error instanceof Error
           ? error.message
-          : '代理接口没有返回可解析的 JSON 数据。',
+          : "The query proxy did not return a readable JSON payload.",
       ok: false,
       requestPayload: payload,
       upstreamStatus: response.status,
@@ -148,22 +106,32 @@ export async function queryEnergyReport(
 
 function truncateUnknown(value: unknown, depth = 0): unknown {
   if (depth > 2) {
-    return '[truncated]';
+    return "[truncated]";
   }
 
-  if (typeof value === 'string') {
+  if (typeof value === "string") {
     return value.length > 600 ? `${value.slice(0, 600)}...` : value;
   }
 
   if (Array.isArray(value)) {
-    const items = value.slice(0, 4).map((item) => truncateUnknown(item, depth + 1));
-    return value.length > 4 ? [...items, `... ${value.length - 4} more item(s)`] : items;
+    const items = value
+      .slice(0, 4)
+      .map((item) => truncateUnknown(item, depth + 1));
+    return value.length > 4
+      ? [...items, `... ${value.length - 4} more item(s)`]
+      : items;
   }
 
-  if (value && typeof value === 'object') {
-    const entries = Object.entries(value as Record<string, unknown>).slice(0, 8);
+  if (value && typeof value === "object") {
+    const entries = Object.entries(value as Record<string, unknown>).slice(
+      0,
+      8,
+    );
     return Object.fromEntries(
-      entries.map(([key, childValue]) => [key, truncateUnknown(childValue, depth + 1)]),
+      entries.map(([key, childValue]) => [
+        key,
+        truncateUnknown(childValue, depth + 1),
+      ]),
     );
   }
 
@@ -180,24 +148,24 @@ export function formatEnergyQueryMessage(
   response: QueryReportProxyResponse,
 ) {
   const lines = [
-    '已调用项目分项能耗查询接口 `queryReport`。',
-    '',
+    "已调用项目分项能耗查询接口 `queryReport`。",
+    "",
     `项目：${form.project}`,
     `组织 ID：${form.orgId}`,
     `能源类型：${form.energyType}`,
-    `时间范围：${form.timeRange}`,
+    `查询日期：${form.startDate} 至 ${form.endDate}`,
     `统计粒度：${form.interval}`,
-    `关键词：${form.queryName || '未填写'}`,
+    `关键词：${form.queryName || "未填写"}`,
     `分页：第 ${form.pageNum} 页 / ${form.pageSize} 条`,
-    '',
-    `请求时间：${format(new Date(), 'yyyy-MM-dd HH:mm:ss')}`,
-    '',
-    '请求参数预览：',
+    "",
+    `请求时间：${format(new Date(), "yyyy-MM-dd HH:mm:ss")}`,
+    "",
+    "请求参数预览：",
     toPreviewText(payload),
   ];
 
   if (!response.ok) {
-    lines.push('');
+    lines.push("");
     lines.push(`接口调用失败，上游状态：${response.upstreamStatus}`);
 
     if (response.message) {
@@ -205,19 +173,19 @@ export function formatEnergyQueryMessage(
     }
 
     if (response.data !== undefined) {
-      lines.push('');
-      lines.push('错误响应预览：');
+      lines.push("");
+      lines.push("错误响应预览：");
       lines.push(toPreviewText(response.data));
     }
 
-    return lines.join('\n');
+    return lines.join("\n");
   }
 
-  lines.push('');
+  lines.push("");
   lines.push(`接口调用成功，上游状态：${response.upstreamStatus}`);
-  lines.push('');
-  lines.push('返回数据预览：');
+  lines.push("");
+  lines.push("返回数据预览：");
   lines.push(toPreviewText(response.data));
 
-  return lines.join('\n');
+  return lines.join("\n");
 }

@@ -1,17 +1,16 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { randomUUID } from 'node:crypto';
-import { fileURLToPath } from 'node:url';
-import { format } from 'date-fns';
-import { getSupabase } from '../lib/supabase.js';
+import fs from "node:fs";
+import path from "node:path";
+import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { format } from "date-fns";
+import { getSupabase } from "../lib/supabase.js";
 const currentDir = path.dirname(fileURLToPath(import.meta.url));
 const projectRootCandidates = [
-    path.resolve(currentDir, '..', '..'),
-    path.resolve(currentDir, '..', '..', '..'),
+    path.resolve(currentDir, "..", ".."),
+    path.resolve(currentDir, "..", "..", ".."),
 ];
-const projectRoot = projectRootCandidates.find((candidate) => fs.existsSync(path.join(candidate, 'package.json'))) ??
-    path.resolve(currentDir, '..', '..');
-const localImportedEnergyDataPath = path.join(projectRoot, 'server', 'data', 'imported-energy-data.json');
+const projectRoot = projectRootCandidates.find((candidate) => fs.existsSync(path.join(candidate, "package.json"))) ?? path.resolve(currentDir, "..", "..");
+const localImportedEnergyDataPath = path.join(projectRoot, "server", "data", "imported-energy-data.json");
 const sumBy = (items, selector) => items.reduce((total, item) => total + (selector(item) ?? 0), 0);
 const percentChange = (current, previous) => {
     if (previous === 0) {
@@ -40,16 +39,16 @@ const endOfPreviousMonth = (date = new Date()) => {
     local.setMilliseconds(-1);
     return local;
 };
-const isPlainObject = (value) => Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+const isPlainObject = (value) => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const normalizeStringValue = (value) => {
-    if (typeof value === 'string') {
+    if (typeof value === "string") {
         const trimmed = value.trim();
-        return trimmed || '';
+        return trimmed || "";
     }
-    if (typeof value === 'number' && Number.isFinite(value)) {
+    if (typeof value === "number" && Number.isFinite(value)) {
         return String(value);
     }
-    return '';
+    return "";
 };
 const truncateText = (value, maxLength) => {
     const trimmed = value.trim();
@@ -59,17 +58,17 @@ const truncateText = (value, maxLength) => {
     return `${trimmed.slice(0, maxLength).trimEnd()}...`;
 };
 const toValidIsoString = (value) => {
-    if (typeof value !== 'string' || !value.trim()) {
-        return '';
+    if (typeof value !== "string" || !value.trim()) {
+        return "";
     }
     const timestamp = Date.parse(value);
-    return Number.isNaN(timestamp) ? '' : new Date(timestamp).toISOString();
+    return Number.isNaN(timestamp) ? "" : new Date(timestamp).toISOString();
 };
 const toFiniteNumber = (value) => {
-    if (typeof value === 'number' && Number.isFinite(value)) {
+    if (typeof value === "number" && Number.isFinite(value)) {
         return value;
     }
-    if (typeof value === 'string' && value.trim()) {
+    if (typeof value === "string" && value.trim()) {
         const numeric = Number(value);
         return Number.isFinite(numeric) ? numeric : 0;
     }
@@ -88,31 +87,46 @@ const getDateFormatter = (timeZone) => {
     if (cached) {
         return cached;
     }
-    const formatter = new Intl.DateTimeFormat('en-CA', {
-        day: '2-digit',
-        month: '2-digit',
+    const formatter = new Intl.DateTimeFormat("en-CA", {
+        day: "2-digit",
+        month: "2-digit",
         timeZone,
-        year: 'numeric',
+        year: "numeric",
     });
     dateFormatterCache.set(timeZone, formatter);
     return formatter;
 };
 const formatDateInTimeZone = (value, timeZone) => {
-    const parts = getDateFormatter(timeZone).formatToParts(typeof value === 'number' ? new Date(value) : value);
-    const year = parts.find((part) => part.type === 'year')?.value ?? '';
-    const month = parts.find((part) => part.type === 'month')?.value ?? '';
-    const day = parts.find((part) => part.type === 'day')?.value ?? '';
-    return year && month && day ? `${year}-${month}-${day}` : '';
+    const parts = getDateFormatter(timeZone).formatToParts(typeof value === "number" ? new Date(value) : value);
+    const year = parts.find((part) => part.type === "year")?.value ?? "";
+    const month = parts.find((part) => part.type === "month")?.value ?? "";
+    const day = parts.find((part) => part.type === "day")?.value ?? "";
+    return year && month && day ? `${year}-${month}-${day}` : "";
 };
 const normalizeSearchText = (value) => normalizeStringValue(value).toLowerCase();
+const normalizeStringList = (value) => {
+    if (!Array.isArray(value)) {
+        return [];
+    }
+    return value.map((item) => normalizeStringValue(item)).filter(Boolean);
+};
+const meterTypeLabelMap = {
+    electricity: "电",
+    gas: "燃气",
+    water: "水",
+};
+const intervalLabelMap = {
+    day: "1天",
+    hour: "1小时",
+};
 const buildSearchTerms = (value) => normalizeSearchText(value)
     .split(/\s+/)
     .map((term) => term.trim())
     .filter(Boolean);
-const resolveDateFromTimestamp = (value, timeZone = 'Asia/Shanghai') => {
+const resolveDateFromTimestamp = (value, timeZone = "Asia/Shanghai") => {
     const timestamp = toFiniteNumber(value);
     if (!timestamp) {
-        return '';
+        return "";
     }
     return formatDateInTimeZone(timestamp, timeZone);
 };
@@ -131,20 +145,20 @@ const matchesImportedEnergyQuery = (row, queryName) => {
         row.sample_date,
     ]
         .map((item) => item.toLowerCase())
-        .join(' ');
+        .join(" ");
     return terms.every((term) => haystack.includes(term));
 };
-const isImportedEnergyProject = (row) => normalizeStringValue(row.metadata?.source) === 'energy-report-import';
+const isImportedEnergyProject = (row) => normalizeStringValue(row.metadata?.source) === "energy-report-import";
 const toImportedEnergyQueryRow = (row, project) => {
     const metadata = normalizeMetadata(row.metadata);
     const sampleDate = normalizeStringValue(metadata.sampleDate) ||
-        formatDateInTimeZone(Date.parse(row.metric_at), 'Asia/Shanghai');
+        formatDateInTimeZone(Date.parse(row.metric_at), "Asia/Shanghai");
     return {
-        energy_path: normalizeStringValue(metadata.energyPath) || 'Uncategorized',
-        granularity: normalizeStringValue(metadata.granularity) || 'day',
+        energy_path: normalizeStringValue(metadata.energyPath) || "Uncategorized",
+        granularity: normalizeStringValue(metadata.granularity) || "day",
         meter_name: normalizeStringValue(metadata.meterName) || row.source,
         meter_number: normalizeStringValue(metadata.meterNumber) || row.source,
-        meter_type: normalizeStringValue(row.energy_type) || 'electricity',
+        meter_type: normalizeStringValue(row.energy_type) || "electricity",
         metadata,
         org_id: project.code,
         organization_path: normalizeStringValue(metadata.organizationPath),
@@ -165,7 +179,7 @@ const readLocalImportedEnergyData = () => {
         return cachedImportedEnergyData;
     }
     try {
-        const parsed = JSON.parse(fs.readFileSync(localImportedEnergyDataPath, 'utf8'));
+        const parsed = JSON.parse(fs.readFileSync(localImportedEnergyDataPath, "utf8"));
         const projects = Array.isArray(parsed.projects)
             ? parsed.projects
             : [];
@@ -206,7 +220,7 @@ const buildImportedEnergyReportResponse = (rows, options) => {
             sampleTime: row.sample_date,
             sourceFile: row.source_file,
             totalOne: Number(toFiniteNumber(row.usage_kwh).toFixed(2)),
-            unit: 'kWh',
+            unit: "kWh",
             usageKwh: Number(toFiniteNumber(row.usage_kwh).toFixed(2)),
         })),
         pageNum: options.pageNum,
@@ -219,7 +233,7 @@ const buildImportedEnergyReportResponse = (rows, options) => {
             orgId: options.orgId,
             projectName: options.projectName,
             requestedGranularity: options.requestedGranularity,
-            returnedGranularity: rows[0]?.granularity ?? 'day',
+            returnedGranularity: rows[0]?.granularity ?? "day",
             startDate: sampleDates[0] ?? options.startDate,
             totalUsageKwh: Number(totalUsageKwh.toFixed(2)),
         },
@@ -235,13 +249,15 @@ const normalizeChatMessages = (messages) => {
             return [];
         }
         const role = message.role;
-        const content = typeof message.content === 'string' ? message.content.trim() : '';
-        const id = typeof message.id === 'string' && message.id.trim() ? message.id.trim() : randomUUID();
-        const thinking = typeof message.thinking === 'string' && message.thinking.trim()
+        const content = typeof message.content === "string" ? message.content.trim() : "";
+        const id = typeof message.id === "string" && message.id.trim()
+            ? message.id.trim()
+            : randomUUID();
+        const thinking = typeof message.thinking === "string" && message.thinking.trim()
             ? message.thinking.trim()
             : undefined;
         const createdAt = toValidIsoString(message.createdAt) || new Date().toISOString();
-        if ((role !== 'assistant' && role !== 'user') || !content) {
+        if ((role !== "assistant" && role !== "user") || !content) {
             return [];
         }
         return [
@@ -255,32 +271,34 @@ const normalizeChatMessages = (messages) => {
         ];
     });
 };
-const normalizeMetadata = (value) => (isPlainObject(value) ? value : {});
+const normalizeMetadata = (value) => isPlainObject(value) ? value : {};
 const deriveSessionTitle = (messages, title) => {
-    if (typeof title === 'string' && title.trim()) {
+    if (typeof title === "string" && title.trim()) {
         return truncateText(title, 48);
     }
-    const firstUserMessage = messages.find((message) => message.role === 'user');
+    const firstUserMessage = messages.find((message) => message.role === "user");
     if (firstUserMessage) {
         return truncateText(firstUserMessage.content, 48);
     }
-    return '新建会话';
+    return "新建会话";
 };
 const deriveSessionSummary = (messages, summary) => {
-    if (typeof summary === 'string' && summary.trim()) {
+    if (typeof summary === "string" && summary.trim()) {
         return truncateText(summary, 96);
     }
     const lastAssistantMessage = [...messages]
         .reverse()
-        .find((message) => message.role === 'assistant');
+        .find((message) => message.role === "assistant");
     if (lastAssistantMessage) {
         return truncateText(lastAssistantMessage.content, 96);
     }
-    const lastUserMessage = [...messages].reverse().find((message) => message.role === 'user');
+    const lastUserMessage = [...messages]
+        .reverse()
+        .find((message) => message.role === "user");
     if (lastUserMessage) {
         return truncateText(lastUserMessage.content, 96);
     }
-    return '';
+    return "";
 };
 const resolveLastMessageAt = (messages) => {
     const lastTimestamp = [...messages]
@@ -317,9 +335,9 @@ const buildChatSessionPayload = (input) => {
         last_message_at: resolveLastMessageAt(messages),
         messages,
         metadata,
-        status: typeof input.status === 'string' && input.status.trim()
+        status: typeof input.status === "string" && input.status.trim()
             ? input.status.trim()
-            : 'active',
+            : "active",
         summary: deriveSessionSummary(messages, input.summary),
         title: deriveSessionTitle(messages, input.title),
     };
@@ -327,9 +345,9 @@ const buildChatSessionPayload = (input) => {
 export const listProjects = async () => {
     const supabase = getSupabase();
     const { data, error } = await supabase
-        .from('projects')
-        .select('id, code, name, location, timezone')
-        .order('created_at', { ascending: true });
+        .from("projects")
+        .select("id, code, name, location, timezone")
+        .order("created_at", { ascending: true });
     if (error) {
         throw error;
     }
@@ -338,17 +356,17 @@ export const listProjects = async () => {
 export const resolveProject = async (projectCode) => {
     const supabase = getSupabase();
     const baseQuery = supabase
-        .from('projects')
-        .select('id, code, name, location, timezone')
+        .from("projects")
+        .select("id, code, name, location, timezone")
         .limit(1);
     const { data, error } = projectCode
-        ? await baseQuery.eq('code', projectCode).maybeSingle()
-        : await baseQuery.order('created_at', { ascending: true }).maybeSingle();
+        ? await baseQuery.eq("code", projectCode).maybeSingle()
+        : await baseQuery.order("created_at", { ascending: true }).maybeSingle();
     if (error) {
         throw error;
     }
     if (!data) {
-        throw new Error('No project data found. Run `npm run db:setup` to initialize your Supabase tables and demo data.');
+        throw new Error("No project data found. Run `npm run db:setup` to initialize your Supabase tables and demo data.");
     }
     return data;
 };
@@ -362,33 +380,33 @@ export const getEnergyAnalysis = async (projectCode) => {
     const currentMonthStart = startOfCurrentMonth(now);
     const previousMonthStart = startOfPreviousMonth(now);
     const previousMonthEnd = endOfPreviousMonth(now);
-    const [todayResult, yesterdayResult, currentMonthResult, previousMonthResult] = await Promise.all([
+    const [todayResult, yesterdayResult, currentMonthResult, previousMonthResult,] = await Promise.all([
         supabase
-            .from('energy_metrics')
-            .select('metric_at, source, usage_kwh, cost_amount, carbon_kg')
-            .eq('project_id', project.id)
-            .gte('metric_at', todayStart.toISOString())
-            .order('metric_at', { ascending: true }),
+            .from("energy_metrics")
+            .select("metric_at, source, usage_kwh, cost_amount, carbon_kg")
+            .eq("project_id", project.id)
+            .gte("metric_at", todayStart.toISOString())
+            .order("metric_at", { ascending: true }),
         supabase
-            .from('energy_metrics')
-            .select('metric_at, source, usage_kwh, cost_amount, carbon_kg')
-            .eq('project_id', project.id)
-            .gte('metric_at', yesterdayStart.toISOString())
-            .lt('metric_at', todayStart.toISOString())
-            .order('metric_at', { ascending: true }),
+            .from("energy_metrics")
+            .select("metric_at, source, usage_kwh, cost_amount, carbon_kg")
+            .eq("project_id", project.id)
+            .gte("metric_at", yesterdayStart.toISOString())
+            .lt("metric_at", todayStart.toISOString())
+            .order("metric_at", { ascending: true }),
         supabase
-            .from('energy_metrics')
-            .select('metric_at, source, usage_kwh, cost_amount, carbon_kg')
-            .eq('project_id', project.id)
-            .gte('metric_at', currentMonthStart.toISOString())
-            .order('metric_at', { ascending: true }),
+            .from("energy_metrics")
+            .select("metric_at, source, usage_kwh, cost_amount, carbon_kg")
+            .eq("project_id", project.id)
+            .gte("metric_at", currentMonthStart.toISOString())
+            .order("metric_at", { ascending: true }),
         supabase
-            .from('energy_metrics')
-            .select('metric_at, source, usage_kwh, cost_amount, carbon_kg')
-            .eq('project_id', project.id)
-            .gte('metric_at', previousMonthStart.toISOString())
-            .lte('metric_at', previousMonthEnd.toISOString())
-            .order('metric_at', { ascending: true }),
+            .from("energy_metrics")
+            .select("metric_at, source, usage_kwh, cost_amount, carbon_kg")
+            .eq("project_id", project.id)
+            .gte("metric_at", previousMonthStart.toISOString())
+            .lte("metric_at", previousMonthEnd.toISOString())
+            .order("metric_at", { ascending: true }),
     ]);
     for (const result of [
         todayResult,
@@ -402,8 +420,10 @@ export const getEnergyAnalysis = async (projectCode) => {
     }
     const todayMetrics = (todayResult.data ?? []);
     const yesterdayMetrics = (yesterdayResult.data ?? []);
-    const currentMonthMetrics = (currentMonthResult.data ?? []);
-    const previousMonthMetrics = (previousMonthResult.data ?? []);
+    const currentMonthMetrics = (currentMonthResult.data ??
+        []);
+    const previousMonthMetrics = (previousMonthResult.data ??
+        []);
     const todayUsage = sumBy(todayMetrics, (metric) => metric.usage_kwh);
     const yesterdayUsage = sumBy(yesterdayMetrics, (metric) => metric.usage_kwh);
     const monthUsage = sumBy(currentMonthMetrics, (metric) => metric.usage_kwh);
@@ -414,7 +434,7 @@ export const getEnergyAnalysis = async (projectCode) => {
     const previousMonthCarbon = sumBy(previousMonthMetrics, (metric) => metric.carbon_kg);
     const chartByTime = new Map();
     todayMetrics.forEach((metric) => {
-        const label = format(new Date(metric.metric_at), 'HH:mm');
+        const label = format(new Date(metric.metric_at), "HH:mm");
         const bucket = chartByTime.get(label) ?? {
             hvac: 0,
             lighting: 0,
@@ -423,13 +443,13 @@ export const getEnergyAnalysis = async (projectCode) => {
             time: label,
         };
         const usage = metric.usage_kwh ?? 0;
-        if (metric.source === 'hvac') {
+        if (metric.source === "hvac") {
             bucket.hvac += usage;
         }
-        else if (metric.source === 'lighting') {
+        else if (metric.source === "lighting") {
             bucket.lighting += usage;
         }
-        else if (metric.source === 'plugs') {
+        else if (metric.source === "plugs") {
             bucket.plugs += usage;
         }
         else {
@@ -465,7 +485,7 @@ export const createEnergyMetric = async (input) => {
     const supabase = getSupabase();
     const project = await resolveProject(input.projectCode);
     const { data, error } = await supabase
-        .from('energy_metrics')
+        .from("energy_metrics")
         .insert({
         carbon_kg: input.carbonKg ?? null,
         cost_amount: input.costAmount ?? null,
@@ -476,7 +496,7 @@ export const createEnergyMetric = async (input) => {
         source: input.source,
         usage_kwh: input.usageKwh,
     })
-        .select('id, metric_at, energy_type, source, usage_kwh, cost_amount, carbon_kg')
+        .select("id, metric_at, energy_type, source, usage_kwh, cost_amount, carbon_kg")
         .single();
     if (error) {
         throw error;
@@ -486,42 +506,113 @@ export const createEnergyMetric = async (input) => {
 const loadImportedProjectRows = async () => {
     const supabase = getSupabase();
     const { data, error } = await supabase
-        .from('projects')
-        .select('id, code, name, metadata')
-        .order('name', { ascending: true });
+        .from("projects")
+        .select("id, code, name, metadata")
+        .order("name", { ascending: true });
     if (error) {
         throw error;
     }
     return (data ?? []).filter((row) => isImportedEnergyProject(row));
 };
-export const listImportedEnergyProjects = async () => {
+const toImportedEnergyProject = (row) => ({
+    availableGranularities: normalizeStringList(row.metadata?.availableGranularities).length > 0
+        ? normalizeStringList(row.metadata?.availableGranularities)
+        : ["day"],
+    availableMeterTypes: normalizeStringList(row.metadata?.availableMeterTypes).length > 0
+        ? normalizeStringList(row.metadata?.availableMeterTypes)
+        : ["electricity"],
+    firstSampleDate: normalizeStringValue(row.metadata?.firstSampleDate),
+    lastSampleDate: normalizeStringValue(row.metadata?.lastSampleDate),
+    orgId: row.code,
+    organizationPath: normalizeStringValue(row.metadata?.organizationPath),
+    projectCode: row.code,
+    projectName: row.name,
+    recordCount: parsePositiveInteger(row.metadata?.recordCount, 0),
+});
+const toEnergyQueryOption = (value, labelMap) => ({
+    label: labelMap[value] ?? value,
+    value,
+});
+export const listImportedEnergyProjects = async (options = {}) => {
+    const allowLocalFallback = options.allowLocalFallback ?? true;
     try {
         const rows = await loadImportedProjectRows();
         if (rows.length > 0) {
-            return rows.map((row) => ({
-                firstSampleDate: normalizeStringValue(row.metadata?.firstSampleDate),
-                lastSampleDate: normalizeStringValue(row.metadata?.lastSampleDate),
-                orgId: row.code,
-                organizationPath: normalizeStringValue(row.metadata?.organizationPath),
-                projectCode: row.code,
-                projectName: row.name,
-                recordCount: parsePositiveInteger(row.metadata?.recordCount, 0),
-            }));
+            return rows.map(toImportedEnergyProject);
+        }
+        if (!allowLocalFallback) {
+            throw new Error("No energy query projects were found in Supabase.");
         }
     }
-    catch {
+    catch (error) {
+        if (!allowLocalFallback) {
+            throw error instanceof Error
+                ? error
+                : new Error("Failed to load energy query projects from Supabase.");
+        }
         // Fall back to the local imported cache when Supabase tables are not ready yet.
     }
-    return readLocalImportedEnergyData()?.projects ?? [];
+    return (readLocalImportedEnergyData()?.projects ?? []).map((project) => ({
+        availableGranularities: Array.isArray(project.availableGranularities) &&
+            project.availableGranularities.length > 0
+            ? project.availableGranularities
+            : ["day"],
+        availableMeterTypes: Array.isArray(project.availableMeterTypes) &&
+            project.availableMeterTypes.length > 0
+            ? project.availableMeterTypes
+            : ["electricity"],
+        firstSampleDate: project.firstSampleDate,
+        lastSampleDate: project.lastSampleDate,
+        orgId: project.orgId,
+        organizationPath: project.organizationPath,
+        projectCode: project.projectCode,
+        projectName: project.projectName,
+        recordCount: project.recordCount,
+    }));
 };
-export const queryImportedEnergyReport = async (payload) => {
+export const getEnergyQueryConfig = async (options = {}) => {
+    const projects = await listImportedEnergyProjects(options);
+    if (projects.length === 0) {
+        throw new Error("No energy query configuration is available in the database.");
+    }
+    const energyTypeValues = [
+        ...new Set(projects.flatMap((project) => project.availableMeterTypes)),
+    ];
+    const intervalValues = [
+        ...new Set(projects.flatMap((project) => project.availableGranularities)),
+    ];
+    const defaultProject = projects[0];
+    const defaultEnergyType = defaultProject.availableMeterTypes[0] ??
+        energyTypeValues[0] ??
+        "electricity";
+    const defaultInterval = defaultProject.availableGranularities[0] ?? intervalValues[0] ?? "day";
+    const defaultEndDate = defaultProject.lastSampleDate || defaultProject.firstSampleDate;
+    const defaultStartDate = defaultProject.lastSampleDate || defaultProject.firstSampleDate;
+    return {
+        defaults: {
+            endDate: defaultEndDate,
+            energyType: defaultEnergyType,
+            interval: defaultInterval,
+            orgId: defaultProject.orgId,
+            pageNum: 1,
+            pageSize: 20,
+            project: defaultProject.projectName,
+            startDate: defaultStartDate,
+        },
+        energyTypes: energyTypeValues.map((value) => toEnergyQueryOption(value, meterTypeLabelMap)),
+        intervals: intervalValues.map((value) => toEnergyQueryOption(value, intervalLabelMap)),
+        projects,
+    };
+};
+export const queryImportedEnergyReport = async (payload, options = {}) => {
+    const allowLocalFallback = options.allowLocalFallback ?? true;
     const orgId = normalizeStringValue(payload.orgId);
-    const meterType = normalizeSearchText(payload.meterType) || 'electricity';
+    const meterType = normalizeSearchText(payload.meterType) || "electricity";
     const startDate = resolveDateFromTimestamp(payload.startTime);
     const endDate = resolveDateFromTimestamp(payload.endTime);
     const pageNum = parsePositiveInteger(payload.pageNum, 1);
     const pageSize = Math.min(parsePositiveInteger(payload.pageSize, 20), 200);
-    const requestedGranularity = parsePositiveInteger(payload.queryType, 2) === 1 ? 'hour' : 'day';
+    const requestedGranularity = parsePositiveInteger(payload.queryType, 2) === 1 ? "hour" : "day";
     try {
         const supabase = getSupabase();
         const importedProjects = await loadImportedProjectRows();
@@ -533,18 +624,18 @@ export const queryImportedEnergyReport = async (payload) => {
             const batchSize = 1000;
             for (let offset = 0;; offset += batchSize) {
                 let query = supabase
-                    .from('energy_query_records')
-                    .select('project_code, project_name, org_id, organization_path, energy_path, meter_name, meter_number, sample_date, granularity, meter_type, usage_kwh, source_file, metadata')
-                    .eq('project_id', project.id)
-                    .eq('meter_type', meterType)
-                    .order('sample_date', { ascending: false })
-                    .order('usage_kwh', { ascending: false })
+                    .from("energy_query_records")
+                    .select("project_code, project_name, org_id, organization_path, energy_path, meter_name, meter_number, sample_date, granularity, meter_type, usage_kwh, source_file, metadata")
+                    .eq("project_id", project.id)
+                    .eq("meter_type", meterType)
+                    .order("sample_date", { ascending: false })
+                    .order("usage_kwh", { ascending: false })
                     .range(offset, offset + batchSize - 1);
                 if (startDate) {
-                    query = query.gte('sample_date', startDate);
+                    query = query.gte("sample_date", startDate);
                 }
                 if (endDate) {
-                    query = query.lte('sample_date', endDate);
+                    query = query.lte("sample_date", endDate);
                 }
                 const { data, error } = await query;
                 if (error) {
@@ -556,8 +647,7 @@ export const queryImportedEnergyReport = async (payload) => {
                     break;
                 }
             }
-            const filteredRows = remoteRows
-                .filter((row) => matchesImportedEnergyQuery(row, payload.queryName));
+            const filteredRows = remoteRows.filter((row) => matchesImportedEnergyQuery(row, payload.queryName));
             return buildImportedEnergyReportResponse(filteredRows, {
                 endDate,
                 meterType,
@@ -569,8 +659,18 @@ export const queryImportedEnergyReport = async (payload) => {
                 startDate,
             });
         }
+        if (!allowLocalFallback) {
+            throw new Error(orgId
+                ? `No Supabase energy records found for orgId "${orgId}".`
+                : "No Supabase energy records are available.");
+        }
     }
-    catch {
+    catch (error) {
+        if (!allowLocalFallback) {
+            throw error instanceof Error
+                ? error
+                : new Error("Failed to query Supabase energy records.");
+        }
         // Fall back to local imported data when Supabase schema is unavailable.
     }
     const localData = readLocalImportedEnergyData();
@@ -582,7 +682,8 @@ export const queryImportedEnergyReport = async (payload) => {
         : (localData?.records ?? []).filter((row) => !localProject || row.org_id === localProject.orgId);
     const filteredRows = scopedLocalRows
         .filter((row) => row.meter_type === meterType)
-        .filter((row) => (!startDate || row.sample_date >= startDate) && (!endDate || row.sample_date <= endDate))
+        .filter((row) => (!startDate || row.sample_date >= startDate) &&
+        (!endDate || row.sample_date <= endDate))
         .filter((row) => matchesImportedEnergyQuery(row, payload.queryName));
     return buildImportedEnergyReportResponse(filteredRows, {
         endDate,
@@ -590,7 +691,7 @@ export const queryImportedEnergyReport = async (payload) => {
         orgId: localProject?.orgId ?? orgId,
         pageNum,
         pageSize,
-        projectName: localProject?.projectName ?? '',
+        projectName: localProject?.projectName ?? "",
         requestedGranularity,
         startDate,
     });
@@ -599,11 +700,11 @@ export const listIntegrations = async (projectCode) => {
     const supabase = getSupabase();
     const project = projectCode ? await resolveProject(projectCode) : null;
     let query = supabase
-        .from('system_integrations')
-        .select('id, name, system_type, base_url, username, auth_type, status, last_synced_at, metadata, created_at')
-        .order('created_at', { ascending: true });
+        .from("system_integrations")
+        .select("id, name, system_type, base_url, username, auth_type, status, last_synced_at, metadata, created_at")
+        .order("created_at", { ascending: true });
     if (project) {
-        query = query.eq('project_id', project.id);
+        query = query.eq("project_id", project.id);
     }
     const { data, error } = await query;
     if (error) {
@@ -615,18 +716,18 @@ export const createIntegration = async (input) => {
     const supabase = getSupabase();
     const project = await resolveProject(input.projectCode);
     const { data, error } = await supabase
-        .from('system_integrations')
+        .from("system_integrations")
         .insert({
-        auth_type: input.authType ?? 'token',
+        auth_type: input.authType ?? "token",
         base_url: input.baseUrl,
         metadata: input.metadata ?? {},
         name: input.name,
         project_id: project.id,
-        status: input.status ?? 'connected',
+        status: input.status ?? "connected",
         system_type: input.systemType,
         username: input.username ?? null,
     })
-        .select('id, name, system_type, base_url, username, auth_type, status, last_synced_at, metadata, created_at')
+        .select("id, name, system_type, base_url, username, auth_type, status, last_synced_at, metadata, created_at")
         .single();
     if (error) {
         throw error;
@@ -637,10 +738,10 @@ export const listReports = async (projectCode) => {
     const supabase = getSupabase();
     const project = await resolveProject(projectCode);
     const { data, error } = await supabase
-        .from('analysis_reports')
-        .select('id, title, summary, report_date, status, file_url, created_at')
-        .eq('project_id', project.id)
-        .order('report_date', { ascending: false });
+        .from("analysis_reports")
+        .select("id, title, summary, report_date, status, file_url, created_at")
+        .eq("project_id", project.id)
+        .order("report_date", { ascending: false });
     if (error) {
         throw error;
     }
@@ -650,17 +751,17 @@ export const createReport = async (input) => {
     const supabase = getSupabase();
     const project = await resolveProject(input.projectCode);
     const { data, error } = await supabase
-        .from('analysis_reports')
+        .from("analysis_reports")
         .insert({
         file_url: input.fileUrl ?? null,
         payload: input.payload ?? {},
         project_id: project.id,
-        report_date: input.reportDate ?? format(new Date(), 'yyyy-MM-dd'),
-        status: input.status ?? 'generated',
-        summary: input.summary ?? '',
+        report_date: input.reportDate ?? format(new Date(), "yyyy-MM-dd"),
+        status: input.status ?? "generated",
+        summary: input.summary ?? "",
         title: input.title,
     })
-        .select('id, title, summary, report_date, status, file_url, created_at')
+        .select("id, title, summary, report_date, status, file_url, created_at")
         .single();
     if (error) {
         throw error;
@@ -670,9 +771,9 @@ export const createReport = async (input) => {
 export const listChatSessions = async () => {
     const supabase = getSupabase();
     const { data, error } = await supabase
-        .from('chat_sessions')
-        .select('id, title, summary, status, metadata, last_message_at, created_at, updated_at')
-        .order('last_message_at', { ascending: false });
+        .from("chat_sessions")
+        .select("id, title, summary, status, metadata, last_message_at, created_at, updated_at")
+        .order("last_message_at", { ascending: false });
     if (error) {
         throw error;
     }
@@ -681,15 +782,15 @@ export const listChatSessions = async () => {
 export const getChatSession = async (sessionId) => {
     const supabase = getSupabase();
     const { data, error } = await supabase
-        .from('chat_sessions')
-        .select('id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at')
-        .eq('id', sessionId)
+        .from("chat_sessions")
+        .select("id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at")
+        .eq("id", sessionId)
         .maybeSingle();
     if (error) {
         throw error;
     }
     if (!data) {
-        throw new Error('Chat session not found.');
+        throw new Error("Chat session not found.");
     }
     return normalizeChatSession(data);
 };
@@ -697,9 +798,9 @@ export const createChatSession = async (input) => {
     const supabase = getSupabase();
     const payload = buildChatSessionPayload(input);
     const { data, error } = await supabase
-        .from('chat_sessions')
+        .from("chat_sessions")
         .insert(payload)
-        .select('id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at')
+        .select("id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at")
         .single();
     if (error) {
         throw error;
@@ -710,16 +811,16 @@ export const updateChatSession = async (sessionId, input) => {
     const supabase = getSupabase();
     const payload = buildChatSessionPayload(input);
     const { data, error } = await supabase
-        .from('chat_sessions')
+        .from("chat_sessions")
         .update(payload)
-        .eq('id', sessionId)
-        .select('id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at')
+        .eq("id", sessionId)
+        .select("id, title, summary, status, messages, metadata, last_message_at, created_at, updated_at")
         .maybeSingle();
     if (error) {
         throw error;
     }
     if (!data) {
-        throw new Error('Chat session not found.');
+        throw new Error("Chat session not found.");
     }
     return normalizeChatSession(data);
 };

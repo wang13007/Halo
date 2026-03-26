@@ -1,23 +1,23 @@
-import cors from 'cors';
-import express from 'express';
-import { env, isSupabaseConfigured, resolveCorsOrigin } from './config.js';
-import { generateHaloArtifact, generateHaloChatReply } from './lib/ai.js';
-import { getSupabase } from './lib/supabase.js';
+import cors from "cors";
+import express from "express";
+import { env, isSupabaseConfigured, resolveCorsOrigin } from "./config.js";
+import { generateHaloArtifact, generateHaloChatReply } from "./lib/ai.js";
+import { getSupabase } from "./lib/supabase.js";
 import {
   createChatSession,
   createEnergyMetric,
   createIntegration,
   createReport,
+  getEnergyQueryConfig,
   getChatSession,
   getEnergyAnalysis,
-  listImportedEnergyProjects,
   listChatSessions,
   listIntegrations,
   listProjects,
   listReports,
   queryImportedEnergyReport,
   updateChatSession,
-} from './services/halo-service.js';
+} from "./services/halo-service.js";
 
 const app = express();
 
@@ -25,46 +25,18 @@ const normalizeCastgc = (rawValue: string) => {
   const value = rawValue.trim();
 
   if (!value) {
-    return '';
+    return "";
   }
 
-  if (value.startsWith('CASTGC:')) {
-    return value.slice('CASTGC:'.length).trim();
+  if (value.startsWith("CASTGC:")) {
+    return value.slice("CASTGC:".length).trim();
   }
 
-  if (value.startsWith('CASTGC=')) {
-    return value.slice('CASTGC='.length).trim();
+  if (value.startsWith("CASTGC=")) {
+    return value.slice("CASTGC=".length).trim();
   }
 
   return value;
-};
-
-const isPlainObject = (value: unknown): value is Record<string, unknown> =>
-  Boolean(value) && typeof value === 'object' && !Array.isArray(value);
-
-const normalizeStringValue = (value: unknown) => {
-  if (typeof value === 'string') {
-    const trimmed = value.trim();
-    return trimmed || '';
-  }
-
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return String(value);
-  }
-
-  return '';
-};
-
-const getFirstNonEmptyString = (record: Record<string, unknown>, keys: string[]) => {
-  for (const key of keys) {
-    const normalized = normalizeStringValue(record[key]);
-
-    if (normalized) {
-      return normalized;
-    }
-  }
-
-  return '';
 };
 
 const buildLongforHeaders = () => {
@@ -72,7 +44,7 @@ const buildLongforHeaders = () => {
   const castgc = normalizeCastgc(env.longforCastgc);
   const gaiaApiKey = env.longforGaiaApiKey.trim();
   const headers: Record<string, string> = {
-    Accept: 'application/json, text/plain, */*',
+    Accept: "application/json, text/plain, */*",
   };
 
   if (authorization) {
@@ -80,7 +52,7 @@ const buildLongforHeaders = () => {
   }
 
   if (gaiaApiKey) {
-    headers['x-gaia-api-key'] = gaiaApiKey;
+    headers["x-gaia-api-key"] = gaiaApiKey;
   }
 
   if (castgc) {
@@ -116,155 +88,35 @@ const parseUpstreamResponse = async (upstreamResponse: Response) => {
   }
 };
 
-type EnergyQuickProject = {
-  channel: string;
-  name: string;
-  orgId: string;
-};
-
-type ProjectCollectContext = {
-  channel: string;
-  path: string[];
-};
-
-const projectChannelKeys = ['channel', 'projectChannel', 'orgChannel'];
-const projectNameKeys = ['name', 'projectName', 'orgName', 'orgFullName', 'label', 'title'];
-const projectIdKeys = ['orgId', 'organizationId', 'projectId', 'projectCode', 'orgCode', 'id', 'code'];
-const projectShapeKeys = [
-  'orgId',
-  'organizationId',
-  'projectId',
-  'projectCode',
-  'orgCode',
-  'projectName',
-  'orgName',
-  'orgFullName',
-];
-
-const collectEnergyQuickProjects = (
-  value: unknown,
-  projects: EnergyQuickProject[],
-  seen: Set<string>,
-  context: ProjectCollectContext = { channel: '', path: [] },
-) => {
-  if (Array.isArray(value)) {
-    value.forEach((item) => collectEnergyQuickProjects(item, projects, seen, context));
-    return;
-  }
-
-  if (!isPlainObject(value)) {
-    return;
-  }
-
-  const channel = getFirstNonEmptyString(value, projectChannelKeys) || context.channel;
-  const name = getFirstNonEmptyString(value, projectNameKeys);
-  const orgId = getFirstNonEmptyString(value, projectIdKeys);
-  const isProjectPath = context.path.some((segment) => /org|project/i.test(segment));
-  const hasProjectShape = isProjectPath || projectShapeKeys.some((key) => key in value);
-
-  if (hasProjectShape && name && orgId) {
-    const dedupeKey = `${orgId}::${name}`;
-
-    if (!seen.has(dedupeKey)) {
-      seen.add(dedupeKey);
-      projects.push({ channel: channel || 'UNKNOWN', name, orgId });
-    }
-  }
-
-  Object.entries(value).forEach(([key, childValue]) => {
-    collectEnergyQuickProjects(childValue, projects, seen, {
-      channel,
-      path: [...context.path, key],
-    });
-  });
-};
-
-const extractEnergyQuickProjects = (payload: unknown) => {
-  const projects: EnergyQuickProject[] = [];
-  collectEnergyQuickProjects(payload, projects, new Set<string>());
-  const preferredProjects = projects.some((project) => project.channel === 'C2')
-    ? projects.filter((project) => project.channel === 'C2')
-    : projects;
-
-  return preferredProjects.sort((left, right) => left.name.localeCompare(right.name, 'zh-CN'));
-};
-
-const getUpstreamBusinessError = (payload: unknown) => {
-  if (!isPlainObject(payload)) {
-    return '';
-  }
-
-  const code = getFirstNonEmptyString(payload, ['code', 'status', 'errCode']);
-
-  if (!code || ['0', '200', 'success', 'SUCCESS'].includes(code)) {
-    return '';
-  }
-
-  const message = getFirstNonEmptyString(payload, ['msg', 'message', 'error', 'errorMessage']);
-  return message ? `${message} (code: ${code})` : `Upstream business error (code: ${code})`;
-};
-
-const describeUpstreamFetchError = (error: unknown, upstreamUrl: string) => {
-  const fallbackMessage = `Failed to fetch upstream service: ${upstreamUrl}`;
-
-  if (!(error instanceof Error)) {
-    return fallbackMessage;
-  }
-
-  const cause = isPlainObject(error.cause) ? error.cause : null;
-  const causeCode = cause ? getFirstNonEmptyString(cause, ['code']) : '';
-  const causeHost = cause ? getFirstNonEmptyString(cause, ['host']) : '';
-  const causePort = cause ? getFirstNonEmptyString(cause, ['port']) : '';
-  const causeMessage = cause ? getFirstNonEmptyString(cause, ['message']) : '';
-  const target = causeHost ? `${causeHost}${causePort ? `:${causePort}` : ''}` : upstreamUrl;
-
-  if (
-    causeCode === 'ECONNRESET' ||
-    error.message.toLowerCase().includes('tls') ||
-    causeMessage.toLowerCase().includes('tls')
-  ) {
-    return `TLS handshake failed while connecting to ${target}. The current environment may need Longfor intranet or VPN access.`;
-  }
-
-  if (causeCode === 'ENOTFOUND') {
-    return `Cannot resolve upstream host for ${upstreamUrl}. Check LONGFOR_USER_INFO_URL.`;
-  }
-
-  if (causeCode === 'ETIMEDOUT') {
-    return `Connection timed out while reaching ${target}.`;
-  }
-
-  return causeCode ? `${error.message} (${causeCode})` : error.message || fallbackMessage;
-};
-
 app.use(cors({ origin: resolveCorsOrigin() }));
 app.use(express.json());
 
-app.get('/api', (_request, response) => {
+app.get("/api", (_request, response) => {
   response.json({
-    message: 'Halo backend is running.',
+    message: "Halo backend is running.",
     routes: [
-      'GET /api/health',
-      'GET /api/projects',
-      'GET /api/chat/sessions',
-      'GET /api/chat/sessions/:sessionId',
-      'POST /api/chat/sessions',
-      'PATCH /api/chat/sessions/:sessionId',
-      'GET /api/energy/analysis',
-      'GET /api/energy/quick-projects',
-      'POST /api/energy/query-report',
-      'POST /api/energy/metrics',
-      'POST /api/ai/chat',
-      'POST /api/ai/coding',
-      'GET /api/reports',
-      'POST /api/reports',
-      'GET /api/integrations',
-      'POST /api/integrations',
+      "GET /api/health",
+      "GET /api/projects",
+      "GET /api/chat/sessions",
+      "GET /api/chat/sessions/:sessionId",
+      "POST /api/chat/sessions",
+      "PATCH /api/chat/sessions/:sessionId",
+      "GET /api/energy/analysis",
+      "GET /api/energy/query-config",
+      "GET /api/energy/quick-projects",
+      "POST /api/energy/query-report",
+      "POST /api/energy/metrics",
+      "POST /api/ai/chat",
+      "POST /api/ai/coding",
+      "GET /api/reports",
+      "POST /api/reports",
+      "GET /api/integrations",
+      "POST /api/integrations",
     ],
   });
 });
 
-app.get('/api/health', async (_request, response) => {
+app.get("/api/health", async (_request, response) => {
   if (!isSupabaseConfigured()) {
     response.json({
       database: {
@@ -273,7 +125,7 @@ app.get('/api/health', async (_request, response) => {
         schemaReady: false,
       },
       serverTime: new Date().toISOString(),
-      status: 'degraded',
+      status: "degraded",
     });
     return;
   }
@@ -281,8 +133,8 @@ app.get('/api/health', async (_request, response) => {
   try {
     const supabase = getSupabase();
     const { data, error } = await supabase
-      .from('projects')
-      .select('id')
+      .from("projects")
+      .select("id")
       .limit(1);
 
     if (error) {
@@ -297,7 +149,7 @@ app.get('/api/health', async (_request, response) => {
         projectCount: data?.length ?? 0,
       },
       serverTime: new Date().toISOString(),
-      status: 'ok',
+      status: "ok",
     });
   } catch (error) {
     response.json({
@@ -306,14 +158,14 @@ app.get('/api/health', async (_request, response) => {
         reachable: false,
         schemaReady: false,
       },
-      error: error instanceof Error ? error.message : 'Unknown database error',
+      error: error instanceof Error ? error.message : "Unknown database error",
       serverTime: new Date().toISOString(),
-      status: 'error',
+      status: "error",
     });
   }
 });
 
-app.get('/api/projects', async (_request, response, next) => {
+app.get("/api/projects", async (_request, response, next) => {
   try {
     const projects = await listProjects();
     response.json({ projects });
@@ -322,7 +174,7 @@ app.get('/api/projects', async (_request, response, next) => {
   }
 });
 
-app.get('/api/chat/sessions', async (_request, response, next) => {
+app.get("/api/chat/sessions", async (_request, response, next) => {
   try {
     const sessions = await listChatSessions();
     response.json({ sessions });
@@ -331,7 +183,7 @@ app.get('/api/chat/sessions', async (_request, response, next) => {
   }
 });
 
-app.get('/api/chat/sessions/:sessionId', async (request, response, next) => {
+app.get("/api/chat/sessions/:sessionId", async (request, response, next) => {
   try {
     const session = await getChatSession(request.params.sessionId);
     response.json({ session });
@@ -340,12 +192,14 @@ app.get('/api/chat/sessions/:sessionId', async (request, response, next) => {
   }
 });
 
-app.post('/api/chat/sessions', async (request, response, next) => {
+app.post("/api/chat/sessions", async (request, response, next) => {
   try {
     const { messages } = request.body ?? {};
 
     if (!Array.isArray(messages)) {
-      response.status(400).json({ error: 'messages must be an array to create a chat session.' });
+      response
+        .status(400)
+        .json({ error: "messages must be an array to create a chat session." });
       return;
     }
 
@@ -356,26 +210,31 @@ app.post('/api/chat/sessions', async (request, response, next) => {
   }
 });
 
-app.patch('/api/chat/sessions/:sessionId', async (request, response, next) => {
+app.patch("/api/chat/sessions/:sessionId", async (request, response, next) => {
   try {
     const { messages } = request.body ?? {};
 
     if (!Array.isArray(messages)) {
-      response.status(400).json({ error: 'messages must be an array to update a chat session.' });
+      response
+        .status(400)
+        .json({ error: "messages must be an array to update a chat session." });
       return;
     }
 
-    const session = await updateChatSession(request.params.sessionId, request.body);
+    const session = await updateChatSession(
+      request.params.sessionId,
+      request.body,
+    );
     response.json({ session });
   } catch (error) {
     next(error);
   }
 });
 
-app.get('/api/energy/analysis', async (request, response, next) => {
+app.get("/api/energy/analysis", async (request, response, next) => {
   try {
     const projectCode =
-      typeof request.query.projectCode === 'string'
+      typeof request.query.projectCode === "string"
         ? request.query.projectCode
         : undefined;
 
@@ -386,12 +245,23 @@ app.get('/api/energy/analysis', async (request, response, next) => {
   }
 });
 
-app.post('/api/ai/chat', async (request, response, next) => {
+app.get("/api/energy/query-config", async (_request, response, next) => {
+  try {
+    const config = await getEnergyQueryConfig({ allowLocalFallback: false });
+    response.json(config);
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post("/api/ai/chat", async (request, response, next) => {
   try {
     const { message } = request.body ?? {};
 
-    if (!message || typeof message !== 'string') {
-      response.status(400).json({ error: 'message is required to generate an AI reply.' });
+    if (!message || typeof message !== "string") {
+      response
+        .status(400)
+        .json({ error: "message is required to generate an AI reply." });
       return;
     }
 
@@ -402,13 +272,14 @@ app.post('/api/ai/chat', async (request, response, next) => {
   }
 });
 
-app.post('/api/ai/coding', async (request, response, next) => {
+app.post("/api/ai/coding", async (request, response, next) => {
   try {
     const { artifactType, name, prompt } = request.body ?? {};
 
     if (!artifactType || !name || !prompt) {
       response.status(400).json({
-        error: 'artifactType, name and prompt are required to generate an AI artifact.',
+        error:
+          "artifactType, name and prompt are required to generate an AI artifact.",
       });
       return;
     }
@@ -420,127 +291,78 @@ app.post('/api/ai/coding', async (request, response, next) => {
   }
 });
 
-app.get('/api/energy/quick-projects', async (_request, response) => {
+app.get("/api/energy/quick-projects", async (_request, response) => {
   try {
-    const importedProjects = await listImportedEnergyProjects();
-
-    if (importedProjects.length > 0) {
-      response.json({
-        projects: importedProjects.map((project) => ({
-          channel: 'LOCAL',
-          name: project.projectName,
-          orgId: project.orgId,
-        })),
-        upstreamStatus: 200,
-        upstreamUrl: 'supabase://public.energy_query_projects',
-      });
-      return;
-    }
-  } catch (error) {
-    console.warn(
-      'Failed to load local energy query projects:',
-      error instanceof Error ? error.message : error,
-    );
-  }
-
-  const longforConfig = buildLongforHeaders();
-
-  if (!hasLongforCredentials(longforConfig)) {
-    response.status(500).json({
-      error:
-        'Missing Longfor credentials. Configure LONGFOR_AUTHORIZATION and LONGFOR_X_GAIA_API_KEY, or configure LONGFOR_CASTGC.',
-      projects: [],
-      upstreamStatus: 500,
-      upstreamUrl: env.longforUserInfoUrl,
-    });
-    return;
-  }
-
-  try {
-    const upstreamResponse = await fetch(env.longforUserInfoUrl, {
-      headers: longforConfig.headers,
-      method: 'GET',
-    });
-    const data = await parseUpstreamResponse(upstreamResponse);
-    const upstreamBusinessError = getUpstreamBusinessError(data);
-
-    if (!upstreamResponse.ok) {
-      const upstreamMessage = isPlainObject(data)
-        ? getFirstNonEmptyString(data, ['message', 'msg', 'error'])
-        : '';
-
-      response.status(upstreamResponse.status).json({
-        error:
-          upstreamMessage ||
-          `Failed to fetch Longfor quick-query projects: ${upstreamResponse.status}`,
-        projects: [],
-        upstreamStatus: upstreamResponse.status,
-        upstreamUrl: env.longforUserInfoUrl,
-      });
-      return;
-    }
-
-    if (upstreamBusinessError) {
-      response.status(401).json({
-        error: upstreamBusinessError,
-        loginUrl: isPlainObject(data) ? getFirstNonEmptyString(data, ['loginUrl']) : '',
-        projects: [],
-        upstreamStatus: upstreamResponse.status,
-        upstreamUrl: env.longforUserInfoUrl,
-      });
-      return;
-    }
+    const config = await getEnergyQueryConfig({ allowLocalFallback: false });
 
     response.json({
-      projects: extractEnergyQuickProjects(data),
-      upstreamStatus: upstreamResponse.status,
-      upstreamUrl: env.longforUserInfoUrl,
+      projects: config.projects.map((project) => ({
+        channel: "DATABASE",
+        name: project.projectName,
+        orgId: project.orgId,
+      })),
+      upstreamStatus: 200,
+      upstreamUrl: "supabase://public.energy_query_projects",
     });
+    return;
   } catch (error) {
-    response.status(502).json({
-      error: describeUpstreamFetchError(error, env.longforUserInfoUrl),
+    response.status(500).json({
+      error:
+        error instanceof Error
+          ? error.message
+          : "Failed to load database-backed energy query projects.",
       projects: [],
-      upstreamStatus: 502,
-      upstreamUrl: env.longforUserInfoUrl,
+      upstreamStatus: 500,
+      upstreamUrl: "supabase://public.energy_query_projects",
     });
+    return;
   }
 });
 
-app.post('/api/energy/query-report', async (request, response) => {
-  const payload = (request.body?.payload ?? request.body ?? {}) as Record<string, unknown>;
+app.post("/api/energy/query-report", async (request, response) => {
+  const payload = (request.body?.payload ?? request.body ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   try {
-    const importedProjects = await listImportedEnergyProjects();
+    const report = await queryImportedEnergyReport(payload, {
+      allowLocalFallback: false,
+    });
+    const message =
+      report.summary.requestedGranularity === "hour"
+        ? "Imported Excel data currently contains daily readings only. Returned daily Supabase records."
+        : "Returned Supabase energy records.";
 
-    if (importedProjects.length > 0) {
-      const report = await queryImportedEnergyReport(payload);
-      const message =
-        report.summary.requestedGranularity === 'hour'
-          ? 'Imported Excel data currently contains daily readings only. Returned daily Supabase records.'
-          : 'Returned local Supabase energy records.';
-
-      response.json({
-        ok: true,
-        upstreamStatus: 200,
-        upstreamUrl: 'supabase://public.energy_query_records',
-        requestPayload: payload,
-        message,
-        data: report,
-      });
-      return;
-    }
+    response.json({
+      ok: true,
+      upstreamStatus: 200,
+      upstreamUrl: "supabase://public.energy_query_records",
+      requestPayload: payload,
+      message,
+      data: report,
+    });
+    return;
   } catch (error) {
     response.status(500).json({
       ok: false,
       upstreamStatus: 500,
-      upstreamUrl: 'supabase://public.energy_query_records',
+      upstreamUrl: "supabase://public.energy_query_records",
       requestPayload: payload,
-      message: error instanceof Error ? error.message : 'Failed to query Supabase energy records.',
+      message:
+        error instanceof Error
+          ? error.message
+          : "Failed to query Supabase energy records.",
     });
-    return;
   }
+});
 
+app.post("/api/energy/query-report-legacy", async (request, response) => {
   const longforConfig = buildLongforHeaders();
+  const payload = (request.body?.payload ?? request.body ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   if (!hasLongforCredentials(longforConfig)) {
     response.status(500).json({
@@ -549,17 +371,17 @@ app.post('/api/energy/query-report', async (request, response) => {
       upstreamUrl: env.longforQueryReportUrl,
       requestPayload: payload,
       message:
-        'Missing Longfor credentials. Configure LONGFOR_AUTHORIZATION and LONGFOR_X_GAIA_API_KEY, or configure LONGFOR_CASTGC.',
+        "缺少龙湖接口鉴权，请在 .env.local 中配置 LONGFOR_AUTHORIZATION 与 LONGFOR_X_GAIA_API_KEY，或配置 LONGFOR_CASTGC。",
     });
     return;
   }
 
   try {
     const upstreamResponse = await fetch(env.longforQueryReportUrl, {
-      method: 'POST',
+      method: "POST",
       headers: {
         ...longforConfig.headers,
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
       body: JSON.stringify(payload),
     });
@@ -578,64 +400,20 @@ app.post('/api/energy/query-report', async (request, response) => {
       upstreamStatus: 502,
       upstreamUrl: env.longforQueryReportUrl,
       requestPayload: payload,
-      message: error instanceof Error ? error.message : 'Failed to proxy queryReport.',
-    });
-  }
-});
-
-app.post('/api/energy/query-report-legacy', async (request, response) => {
-  const longforConfig = buildLongforHeaders();
-  const payload = (request.body?.payload ?? request.body ?? {}) as Record<string, unknown>;
-
-  if (!hasLongforCredentials(longforConfig)) {
-    response.status(500).json({
-      ok: false,
-      upstreamStatus: 500,
-      upstreamUrl: env.longforQueryReportUrl,
-      requestPayload: payload,
       message:
-        '缺少龙湖接口鉴权，请在 .env.local 中配置 LONGFOR_AUTHORIZATION 与 LONGFOR_X_GAIA_API_KEY，或配置 LONGFOR_CASTGC。',
-    });
-    return;
-  }
-
-  try {
-    const upstreamResponse = await fetch(env.longforQueryReportUrl, {
-      method: 'POST',
-      headers: {
-        ...longforConfig.headers,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(payload),
-    });
-    const data = await parseUpstreamResponse(upstreamResponse);
-
-    response.status(upstreamResponse.status).json({
-      ok: upstreamResponse.ok,
-      upstreamStatus: upstreamResponse.status,
-      upstreamUrl: env.longforQueryReportUrl,
-      requestPayload: payload,
-      data,
-    });
-  } catch (error) {
-    response.status(502).json({
-      ok: false,
-      upstreamStatus: 502,
-      upstreamUrl: env.longforQueryReportUrl,
-      requestPayload: payload,
-      message: error instanceof Error ? error.message : 'queryReport 代理请求失败。',
+        error instanceof Error ? error.message : "queryReport 代理请求失败。",
     });
   }
 });
 
-app.post('/api/energy/metrics', async (request, response, next) => {
+app.post("/api/energy/metrics", async (request, response, next) => {
   try {
     const { energyType, metricAt, source, usageKwh } = request.body ?? {};
 
     if (!energyType || !metricAt || !source || usageKwh === undefined) {
       response.status(400).json({
         error:
-          'energyType, metricAt, source and usageKwh are required to create an energy metric.',
+          "energyType, metricAt, source and usageKwh are required to create an energy metric.",
       });
       return;
     }
@@ -647,10 +425,10 @@ app.post('/api/energy/metrics', async (request, response, next) => {
   }
 });
 
-app.get('/api/reports', async (request, response, next) => {
+app.get("/api/reports", async (request, response, next) => {
   try {
     const projectCode =
-      typeof request.query.projectCode === 'string'
+      typeof request.query.projectCode === "string"
         ? request.query.projectCode
         : undefined;
 
@@ -661,12 +439,14 @@ app.get('/api/reports', async (request, response, next) => {
   }
 });
 
-app.post('/api/reports', async (request, response, next) => {
+app.post("/api/reports", async (request, response, next) => {
   try {
     const { title } = request.body ?? {};
 
     if (!title) {
-      response.status(400).json({ error: 'title is required to create a report.' });
+      response
+        .status(400)
+        .json({ error: "title is required to create a report." });
       return;
     }
 
@@ -677,10 +457,10 @@ app.post('/api/reports', async (request, response, next) => {
   }
 });
 
-app.get('/api/integrations', async (request, response, next) => {
+app.get("/api/integrations", async (request, response, next) => {
   try {
     const projectCode =
-      typeof request.query.projectCode === 'string'
+      typeof request.query.projectCode === "string"
         ? request.query.projectCode
         : undefined;
 
@@ -691,13 +471,14 @@ app.get('/api/integrations', async (request, response, next) => {
   }
 });
 
-app.post('/api/integrations', async (request, response, next) => {
+app.post("/api/integrations", async (request, response, next) => {
   try {
     const { baseUrl, name, systemType } = request.body ?? {};
 
     if (!name || !systemType || !baseUrl) {
       response.status(400).json({
-        error: 'name, systemType and baseUrl are required to create an integration.',
+        error:
+          "name, systemType and baseUrl are required to create an integration.",
       });
       return;
     }
@@ -717,7 +498,7 @@ app.use(
     _next: express.NextFunction,
   ) => {
     const message =
-      error instanceof Error ? error.message : 'Unexpected server error';
+      error instanceof Error ? error.message : "Unexpected server error";
 
     response.status(500).json({ error: message });
   },
