@@ -5,6 +5,17 @@ const resolveApiBaseUrl = () => {
     String(import.meta.env.VITE_API_BASE_URL ?? "").trim(),
   );
 
+  if (typeof window !== "undefined") {
+    const currentHost = window.location.hostname;
+    const isFileProtocol = window.location.protocol === "file:";
+    const isLocalPage =
+      currentHost === "localhost" || currentHost === "127.0.0.1";
+
+    if (!configuredBaseUrl && (isLocalPage || isFileProtocol)) {
+      return "http://127.0.0.1:8787";
+    }
+  }
+
   if (!configuredBaseUrl) {
     return "";
   }

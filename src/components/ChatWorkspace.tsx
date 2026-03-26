@@ -67,6 +67,8 @@ const quickIntents: Array<{
   },
 ];
 
+const defaultQuickIntent: QuickIntentId = "energy-query";
+
 const emptyProjectOptions: EnergyQuickProject[] = [];
 
 const energyTypeLabels: Record<string, string> = {
@@ -361,10 +363,8 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   );
   const [projectLoadError, setProjectLoadError] = useState("");
   const [projectsLoading, setProjectsLoading] = useState(false);
-  const [selectedIntent, setSelectedIntent] = useState<QuickIntentId | null>(
-    null,
-  );
-  const [showIntentPanel, setShowIntentPanel] = useState(false);
+  const [selectedIntent, setSelectedIntent] =
+    useState<QuickIntentId>(defaultQuickIntent);
   const [historyLoading, setHistoryLoading] = useState(true);
   const [historyError, setHistoryError] = useState("");
   const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
@@ -635,10 +635,6 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     : "border-white/80 bg-white/84";
   const mutedSurface = isDarkMode ? "bg-white/5" : "bg-slate-50";
   const promptProjectName = selectedProject?.name || chatForm.project || "项目";
-  const selectedIntentMeta = useMemo(
-    () => quickIntents.find((intent) => intent.id === selectedIntent) ?? null,
-    [selectedIntent],
-  );
   const activeHistorySession = useMemo(
     () =>
       historySessions.find((session) => session.id === activeSessionId) ?? null,
@@ -783,8 +779,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     setCurrentSessionId(null);
     setChatMessages([]);
     setInput("");
-    setSelectedIntent(null);
-    setShowIntentPanel(false);
+    setSelectedIntent(defaultQuickIntent);
     setSessionSaveError("");
     setLastSavedAt(null);
     setLoadingSessionId(null);
@@ -812,8 +807,6 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
     setChatMessages(nextMessages);
     setInput("");
-    setSelectedIntent(null);
-    setShowIntentPanel(false);
     setIsThinking(true);
     setSessionSaveError("");
 
@@ -953,8 +946,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
       setChatMessages(mapSessionMessagesToView(session.messages));
       setCurrentSessionId(session.id);
-      setSelectedIntent(null);
-      setShowIntentPanel(false);
+      setSelectedIntent(defaultQuickIntent);
       setInput("");
       setLastSavedAt(session.updated_at);
       upsertHistorySession(session);
@@ -1114,23 +1106,43 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           </div>
 
           <div className="mt-3 shrink-0 rounded-[24px] border p-4 shadow-sm">
-            {selectedIntentMeta && (
-              <div className="mb-3 rounded-[20px] border border-blue-500/20 bg-blue-500/5 p-3">
-                <div className="flex items-center justify-between gap-3">
+            <div className="mb-3 rounded-[20px] border border-sky-500/15 bg-sky-500/5 p-3">
+                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
                   <div>
-                    <div className="text-sm font-bold text-blue-600">
-                      {selectedIntentMeta.label}
+                    <div className="text-sm font-bold text-sky-600">
+                      快捷触发
                     </div>
                     <div className={`mt-1 text-xs leading-5 ${textSecondary}`}>
-                      {selectedIntentMeta.description}
+                      先选项目、能源类型和时间范围，再直接发问。
                     </div>
                   </div>
-                  <button
-                    onClick={() => setSelectedIntent(null)}
-                    className={`rounded-full px-3 py-1 text-xs font-bold ${mutedSurface} ${textPrimary}`}
+                  {/*
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
                   >
                     清除
                   </button>
+                </div>
+
+                  */}
+                  <div className="flex flex-wrap gap-2">
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
+                    >
+                      {promptProjectName}
+                    </span>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
+                    >
+                      {selectedEnergyTypeLabel}
+                    </span>
+                    <span
+                      className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
+                    >
+                      {selectedTimeRangeLabel}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
@@ -1253,33 +1265,10 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
                   </div>
                 )}
               </div>
-            )}
-
-            {showIntentPanel && (
-              <div className="mb-3 flex flex-wrap gap-2">
-                {quickIntents.map((intent) => (
-                  <button
-                    key={intent.id}
-                    onClick={() => {
-                      setSelectedIntent(intent.id);
-                      composerRef.current?.focus();
-                    }}
-                    className={`rounded-full px-4 py-2 text-sm font-semibold ${
-                      selectedIntent === intent.id
-                        ? "bg-slate-900 text-white dark:bg-white dark:text-slate-900"
-                        : `${cardSurface} ${textPrimary}`
-                    }`}
-                  >
-                    {intent.label}
-                  </button>
-                ))}
-              </div>
-            )}
 
             <textarea
               ref={composerRef}
               value={input}
-              onClick={() => setShowIntentPanel(true)}
               onChange={(event) => setInput(event.target.value)}
               onKeyDown={handleComposerKeyDown}
               placeholder={`输入你的问题，例如：帮我诊断 ${promptProjectName} 最近一天的异常用能。`}

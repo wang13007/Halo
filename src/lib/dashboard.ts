@@ -107,6 +107,76 @@ export const createInitialDashboardState = (): DashboardState => {
       title: '碳排放实时监控',
       value: '24.8 tCO2e',
     },
+    {
+      accent: 'from-indigo-500 via-sky-400 to-transparent',
+      category: 'system',
+      description:
+        'Forecast the next 24 hours of load and surface the best operating window before the evening peak arrives.',
+      helper:
+        'The projected peak remains concentrated between 18:00 and 21:00, with headroom pressure rising by 6.4%.',
+      id: 'widget-forecast',
+      items: [
+        'Peak window: 18:00 - 21:00',
+        'Expected load swing: +6.4%',
+        'Pre-cooling can start before 17:00',
+        'Storage dispatch can offset about 480 kW',
+      ],
+      size: '2:2',
+      title: 'Load Forecast',
+      value: '96.4%',
+    },
+    {
+      accent: 'from-amber-500 via-orange-300 to-transparent',
+      category: 'system',
+      description:
+        'Summarize the current storage dispatch slot, available capacity, and recommended charge-discharge cadence.',
+      helper:
+        'The storage system is best prepared before 18:00, then discharged through the evening peak window.',
+      id: 'widget-storage',
+      items: [
+        'Available capacity: 72%',
+        'Charge window: 13:00 - 16:00',
+        'Discharge window: 18:00 - 21:00',
+        'Expected peak shaving: 480 kW',
+      ],
+      size: '2:1',
+      title: 'Storage Dispatch',
+      value: '18:00 - 21:00',
+    },
+    {
+      accent: 'from-rose-500 via-orange-300 to-transparent',
+      category: 'system',
+      description:
+        'Track alert response speed and closure quality so operators can see what still needs attention at a glance.',
+      helper:
+        'Alert handling remains stable today, with only three new items still waiting for action.',
+      id: 'widget-alerts',
+      items: [
+        'Pending alerts: 3',
+        '5-minute response rate: 87%',
+        'No critical alerts active',
+      ],
+      size: '1:1',
+      title: 'Alert Closure',
+      value: '87%',
+    },
+    {
+      accent: 'from-emerald-500 via-cyan-300 to-transparent',
+      category: 'system',
+      description:
+        'Aggregate the highest-impact savings opportunities and rank them by expected return and delivery speed.',
+      helper:
+        'HVAC strategy, lighting linkage, and storage coordination are still the three strongest savings levers.',
+      id: 'widget-savings',
+      items: [
+        '4 opportunities can land this week',
+        'Expected monthly value: CNY 126k',
+        'HVAC optimization remains P1',
+      ],
+      size: '1:1',
+      title: 'Savings Pool',
+      value: 'CNY 126k',
+    },
   ];
 
   const tabs: DashboardTab[] = [
@@ -120,6 +190,10 @@ export const createInitialDashboardState = (): DashboardState => {
         'widget-actions',
         'widget-focus',
         'widget-rhythm',
+        'widget-forecast',
+        'widget-storage',
+        'widget-alerts',
+        'widget-savings',
       ],
     },
     {
@@ -127,9 +201,11 @@ export const createInitialDashboardState = (): DashboardState => {
       name: '双碳监控',
       widgetIds: [
         'widget-rhythm',
+        'widget-forecast',
         'widget-focus',
         'widget-breakdown',
         'widget-energy',
+        'widget-savings',
       ],
     },
   ];

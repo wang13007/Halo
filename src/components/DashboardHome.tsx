@@ -71,7 +71,7 @@ type WidgetScale = {
 const sizeButtonOptions: WidgetSize[] = ['1:1', '2:1', '2:2'];
 
 const dashboardGridClassName =
-  'grid grid-cols-1 gap-5 md:auto-rows-[220px] md:grid-cols-6 xl:grid-cols-12';
+  'grid grid-cols-1 gap-5 md:grid-flow-row-dense md:auto-rows-[204px] md:grid-cols-6 xl:auto-rows-[216px] xl:grid-cols-12';
 
 const widgetScaleMap: Record<WidgetSize, WidgetScale> = {
   '1:1': {
@@ -85,12 +85,12 @@ const widgetScaleMap: Record<WidgetSize, WidgetScale> = {
     eyebrowClassName: 'text-[10px] tracking-[0.14em]',
     iconBoxClassName: 'h-9 w-9 rounded-[18px]',
     iconSize: 17,
-    majorMetricClassName: 'text-[34px] sm:text-[38px]',
-    mediumMetricClassName: 'text-[28px] sm:text-[32px]',
-    minorMetricClassName: 'text-[18px]',
+    majorMetricClassName: 'text-[30px] sm:text-[34px]',
+    mediumMetricClassName: 'text-[24px] sm:text-[28px]',
+    minorMetricClassName: 'text-[16px]',
     panelPaddingClassName: 'p-4',
     sectionGapClassName: 'mt-5',
-    titleClassName: 'text-[14px] leading-5',
+    titleClassName: 'text-[13px] leading-5',
     unitClassName: 'pb-1 text-sm',
   },
   '2:1': {
@@ -104,12 +104,12 @@ const widgetScaleMap: Record<WidgetSize, WidgetScale> = {
     eyebrowClassName: 'text-[11px] tracking-[0.16em]',
     iconBoxClassName: 'h-10 w-10 rounded-[20px]',
     iconSize: 18,
-    majorMetricClassName: 'text-[42px] sm:text-[50px] lg:text-[56px]',
-    mediumMetricClassName: 'text-[34px] sm:text-[40px]',
-    minorMetricClassName: 'text-[20px]',
+    majorMetricClassName: 'text-[38px] sm:text-[44px] lg:text-[48px]',
+    mediumMetricClassName: 'text-[30px] sm:text-[34px]',
+    minorMetricClassName: 'text-[18px]',
     panelPaddingClassName: 'p-5',
     sectionGapClassName: 'mt-6',
-    titleClassName: 'text-[15px] leading-5',
+    titleClassName: 'text-[14px] leading-5',
     unitClassName: 'pb-1.5 text-base sm:text-lg',
   },
   '2:2': {
@@ -123,20 +123,20 @@ const widgetScaleMap: Record<WidgetSize, WidgetScale> = {
     eyebrowClassName: 'text-[11px] tracking-[0.18em]',
     iconBoxClassName: 'h-11 w-11 rounded-[20px]',
     iconSize: 20,
-    majorMetricClassName: 'text-[48px] sm:text-[56px] lg:text-[64px]',
-    mediumMetricClassName: 'text-[36px] sm:text-[42px]',
-    minorMetricClassName: 'text-[22px]',
+    majorMetricClassName: 'text-[42px] sm:text-[48px] lg:text-[56px]',
+    mediumMetricClassName: 'text-[32px] sm:text-[38px]',
+    minorMetricClassName: 'text-[20px]',
     panelPaddingClassName: 'p-6',
     sectionGapClassName: 'mt-8',
-    titleClassName: 'text-[16px] leading-6',
+    titleClassName: 'text-[15px] leading-6',
     unitClassName: 'pb-2 text-lg sm:text-xl',
   },
 };
 
 const widgetMobileHeightClassMap: Record<WidgetSize, string> = {
-  '1:1': 'min-h-[320px]',
-  '2:1': 'min-h-[280px]',
-  '2:2': 'min-h-[520px]',
+  '1:1': 'min-h-[280px]',
+  '2:1': 'min-h-[260px]',
+  '2:2': 'min-h-[460px]',
 };
 
 const sizeDescriptionMap: Record<WidgetSize, string> = {
@@ -176,11 +176,15 @@ const multiEnergyLegend = [
 
 const widgetIconMap: Record<string, LucideIcon> = {
   'widget-actions': ListTodo,
+  'widget-alerts': ListTodo,
   'widget-breakdown': BarChart3,
   'widget-energy': Bolt,
+  'widget-forecast': BarChart3,
   'widget-focus': BarChart3,
   'widget-integration': SunMedium,
   'widget-rhythm': Leaf,
+  'widget-savings': Leaf,
+  'widget-storage': Bolt,
 };
 
 const clampTextStyle = (lines: number): CSSProperties =>
@@ -814,7 +818,7 @@ const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
 }) => {
   const theme = getWidgetTheme(isDarkMode);
   const framePaddingClassName =
-    widget.size === '1:1' ? 'p-5 sm:p-6' : widget.size === '2:2' ? 'p-6 sm:p-7' : 'p-5 sm:p-6';
+    widget.size === '1:1' ? 'p-4 sm:p-5' : widget.size === '2:2' ? 'p-5 sm:p-6' : 'p-[18px] sm:p-[22px]';
 
   return (
     <article

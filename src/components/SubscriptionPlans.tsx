@@ -90,7 +90,7 @@ export const SubscriptionPlans = ({ isDarkMode }: { isDarkMode: boolean }) => {
         ))}
       </div>
 
-      <div className="grid flex-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_320px]">
+      <div className="grid flex-1 gap-4 xl:grid-cols-2">
         {plans.map((plan) => (
           <article
             key={plan.id}
@@ -142,28 +142,6 @@ export const SubscriptionPlans = ({ isDarkMode }: { isDarkMode: boolean }) => {
             </button>
           </article>
         ))}
-
-        <section className={`rounded-[28px] border p-5 shadow-sm ${cardSurface}`}>
-          <h3 className={`text-sm font-black uppercase tracking-[0.22em] ${textSecondary}`}>
-            核心差异
-          </h3>
-          <div className="mt-4 grid gap-4">
-            <div className={`rounded-[22px] p-4 ${mutedSurface}`}>
-              <div className="text-sm font-bold text-slate-500">基础版</div>
-              <div className={`mt-2 text-base font-bold ${textPrimary}`}>免费，适合轻量试用</div>
-              <p className={`mt-3 text-sm leading-6 ${textSecondary}`}>
-                默认提供标准看板、基础对话和固定系统查看能力，仅支持 1 个用户。
-              </p>
-            </div>
-            <div className={`rounded-[22px] p-4 ${mutedSurface}`}>
-              <div className="text-sm font-bold text-slate-500">高级版</div>
-              <div className={`mt-2 text-base font-bold ${textPrimary}`}>适合团队化与定制化使用</div>
-              <p className={`mt-3 text-sm leading-6 ${textSecondary}`}>
-                支持自定义小组件、自定义应用、无限次对话生成和自定义系统接口，并扩展到 100 个用户。
-              </p>
-            </div>
-          </div>
-        </section>
       </div>
     </div>
   );
