@@ -96,20 +96,25 @@ const normalizeStringList = (value: unknown) =>
     ? value.map((item) => normalizeString(item)).filter(Boolean)
     : [];
 
+const resolveQuickProjectName = (project: Partial<EnergyQuickProject>) =>
+  normalizeString(project.name) || normalizeString(project.projectName);
+
 const normalizeQuickProjects = (
   projects: Array<Partial<EnergyQuickProject>>,
 ) => {
   const dedupedProjects = new Map<string, EnergyQuickProject>();
 
   projects.forEach((project) => {
-    const name = normalizeString(project.name);
-    const orgId = normalizeString(project.orgId);
+    const name = resolveQuickProjectName(project);
+    const orgId =
+      normalizeString(project.orgId) || normalizeString(project.projectCode);
+    const projectCode = normalizeString(project.projectCode) || orgId;
 
     if (!name || !orgId) {
       return;
     }
 
-    dedupedProjects.set(`${orgId}::${name}`, {
+    dedupedProjects.set(projectCode || orgId, {
       availableGranularities: normalizeStringList(
         project.availableGranularities,
       ),
@@ -120,7 +125,7 @@ const normalizeQuickProjects = (
       name,
       orgId,
       organizationPath: normalizeString(project.organizationPath),
-      projectCode: normalizeString(project.projectCode) || orgId,
+      projectCode,
       recordCount:
         typeof project.recordCount === "number" &&
         Number.isFinite(project.recordCount)
@@ -655,7 +660,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     }
 
     if (chatMessages.length === 0) {
-      return "点击“新建会话”开始新的对话，消息会自动写入数据库历史会话。";
+      return "";
     }
 
     if (lastSavedAt) {
@@ -1004,7 +1009,9 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
             <h2 className={`text-xl font-black tracking-tight ${textPrimary}`}>
               对话工作台
             </h2>
-            <p className={`mt-1 text-sm ${statusTone}`}>{conversationStatus}</p>
+            {conversationStatus ? (
+              <p className={`mt-1 text-sm ${statusTone}`}>{conversationStatus}</p>
+            ) : null}
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

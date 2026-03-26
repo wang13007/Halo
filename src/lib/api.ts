@@ -290,6 +290,7 @@ export type EnergyQuickProject = {
   orgId: string;
   organizationPath?: string;
   projectCode?: string;
+  projectName?: string;
   recordCount?: number;
 };
 

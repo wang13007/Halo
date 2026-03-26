@@ -64,8 +64,7 @@ const App = () => {
   }, []);
 
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
-  const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
-  const pageBackground = isDarkMode ? 'bg-[#06111f]' : 'bg-[#f4f7fb]';
+  const pageBackground = isDarkMode ? 'bg-[#06111f]' : 'bg-[#edf3f8]';
   const sidebarSurface = isDarkMode
     ? 'border-white/10 bg-slate-950/82'
     : 'border-slate-200/70 bg-white/84';
@@ -110,12 +109,12 @@ const App = () => {
               <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-900 text-white shadow-lg shadow-slate-900/10">
                 <Sparkles size={18} />
               </div>
-              {isSidebarExpanded && (
+              {isSidebarExpanded ? (
                 <div>
                   <div className={`text-lg font-black tracking-tight ${textPrimary}`}>Halo</div>
                   <div className="text-xs text-slate-500">Web Console</div>
                 </div>
-              )}
+              ) : null}
             </div>
 
             <button
@@ -149,18 +148,16 @@ const App = () => {
                 <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 text-sm font-bold text-white">
                   W
                 </div>
-                {isSidebarExpanded && (
+                {isSidebarExpanded ? (
                   <div className="min-w-0 text-left">
                     <div className={`truncate text-sm font-bold ${textPrimary}`}>Mr.Wang</div>
                     <div className="truncate text-xs text-slate-500">系统管理员</div>
                   </div>
-                )}
+                ) : null}
               </button>
 
-              {showUserMenu && (
-                <div
-                  className={`absolute bottom-full left-0 mb-3 w-56 rounded-[28px] border p-2 shadow-2xl ${cardSurface}`}
-                >
+              {showUserMenu ? (
+                <div className={`absolute bottom-full left-0 mb-3 w-56 rounded-[28px] border p-2 shadow-2xl ${cardSurface}`}>
                   <button
                     onClick={() => {
                       setActiveTab('subscription');
@@ -183,7 +180,7 @@ const App = () => {
                     退出登录
                   </button>
                 </div>
-              )}
+              ) : null}
             </div>
           </div>
         </aside>
@@ -196,13 +193,12 @@ const App = () => {
                   {pageMeta.title}
                 </h1>
               </div>
-
               <div className="flex gap-3">{renderHeaderAction()}</div>
             </div>
           </header>
 
           <div className="min-h-0 flex-1 overflow-hidden px-6 pb-6 lg:px-8">
-            {activeTab === 'dashboard' && (
+            {activeTab === 'dashboard' ? (
               <DashboardHome
                 dashboardState={dashboardState}
                 editorOpen={isDashboardEditorOpen}
@@ -210,17 +206,17 @@ const App = () => {
                 onChange={setDashboardState}
                 onCloseEditor={() => setIsDashboardEditorOpen(false)}
               />
-            )}
-            {activeTab === 'chat' && <ChatWorkspace isDarkMode={isDarkMode} />}
-            {activeTab === 'apps' && (
+            ) : null}
+            {activeTab === 'chat' ? <ChatWorkspace isDarkMode={isDarkMode} /> : null}
+            {activeTab === 'apps' ? (
               <AppsShowcase
                 appCenterState={appCenterState}
                 isDarkMode={isDarkMode}
                 onChange={setAppCenterState}
               />
-            )}
-            {activeTab === 'config' && <ConfigCenter isDarkMode={isDarkMode} />}
-            {activeTab === 'subscription' && <SubscriptionPlans isDarkMode={isDarkMode} />}
+            ) : null}
+            {activeTab === 'config' ? <ConfigCenter isDarkMode={isDarkMode} /> : null}
+            {activeTab === 'subscription' ? <SubscriptionPlans isDarkMode={isDarkMode} /> : null}
           </div>
         </main>
       </div>
@@ -249,7 +245,7 @@ const NavItem: React.FC<{
     } ${expanded ? '' : 'justify-center'}`}
   >
     <Icon size={18} />
-    {expanded && <span>{label}</span>}
+    {expanded ? <span>{label}</span> : null}
   </button>
 );
 
