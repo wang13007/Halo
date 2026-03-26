@@ -5,12 +5,26 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock3,
+  Plus,
   Send,
   Sparkles,
   Square,
 } from 'lucide-react';
-import { api, type EnergyQuickProject, type Project } from '../lib/api';
-import { buildEnergyQueryPayload, queryEnergyReport, type ChatQueryForm } from '../lib/energyQuery';
+import {
+  api,
+  type ChatSession,
+  type ChatSessionMessage,
+  type ChatSessionSummary,
+  type EnergyQuickProject,
+  type Project,
+  type UpsertChatSessionPayload,
+} from '../lib/api';
+import { createChatSessionStore, toChatSessionSummary } from '../lib/chatSessions';
+import {
+  buildEnergyQueryPayload,
+  queryEnergyReport,
+  type ChatQueryForm,
+} from '../lib/energyQuery';
 
 type QuickIntentId =
   | 'energy-compare'
@@ -18,24 +32,12 @@ type QuickIntentId =
   | 'energy-query'
   | 'energy-report';
 
-type ChatMessage = {
-  content: string;
-  id: string;
-  role: 'assistant' | 'user';
+type ChatMessage = ChatSessionMessage & {
   showThinking?: boolean;
-  thinking?: string;
-};
-
-type HistoryItem = {
-  assistantReply: string;
-  id: number;
-  summary: string;
-  time: string;
-  title: string;
-  userPrompt: string;
 };
 
 const emptyProjectOptions: EnergyQuickProject[] = [];
+const historyFallbackNotice = '历史会话服务不可用，当前改为浏览器本地自动保存。';
 
 const quickIntents: Array<{
   description: string;
@@ -60,40 +62,43 @@ const quickIntents: Array<{
   {
     description: '围绕异常波动、基线偏高和节能机会生成诊断建议。',
     id: 'energy-diagnostic',
-    label: '能源诊断报告',
-  },
-];
-
-const createHistoryItems = (projectName: string): HistoryItem[] => [
-  {
-    assistantReply: `今天 ${projectName} 的暖通空调仍是主要负荷来源，建议优先检查 13:00 之后的运行策略，并比对照明负荷是否同步上升。`,
-    id: 1,
-    summary: '今日趋势与异常波动复盘',
-    time: '10 分钟前',
-    title: `${projectName}今日能耗概览`,
-    userPrompt: `帮我总结今天 ${projectName} 的能耗重点。`,
-  },
-  {
-    assistantReply:
-      '本周报告建议按总能耗、暖通负荷、异常时段、整改建议四个部分输出，方便管理层快速阅读。',
-    id: 2,
-    summary: '生成周报大纲并汇总关键变化',
-    time: '2 小时前',
-    title: '周报生成记录',
-    userPrompt: '生成本周能耗周报提纲。',
-  },
-  {
-    assistantReply:
-      '照明插座在本月晚间波动更明显，暖通空调的峰值集中在工作时段，建议做时段对比后再细分设备层级。',
-    id: 3,
-    summary: '对比暖通与照明的成本差异',
-    time: '昨天',
-    title: '分项对比分析',
-    userPrompt: '比较暖通空调和照明插座的能耗差异。',
+    label: '能源诊断',
   },
 ];
 
 const createId = () => `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+const createChatMessage = ({
+  content,
+  role,
+  thinking,
+}: {
+  content: string;
+  role: 'assistant' | 'user';
+  thinking?: string;
+}): ChatMessage => ({
+  content,
+  createdAt: new Date().toISOString(),
+  id: createId(),
+  role,
+  showThinking: false,
+  ...(thinking ? { thinking } : {}),
+});
+
+const mapSessionMessagesToView = (messages: ChatSessionMessage[]): ChatMessage[] =>
+  messages.map((message) => ({
+    ...message,
+    showThinking: false,
+  }));
+
+const mapViewMessagesToSession = (messages: ChatMessage[]): ChatSessionMessage[] =>
+  messages.map(({ content, createdAt, id, role, thinking }) => ({
+    content,
+    createdAt,
+    id,
+    role,
+    ...(thinking ? { thinking } : {}),
+  }));
 
 const normalizeQuickProjects = (projects: Array<Partial<EnergyQuickProject>>) => {
   const dedupedProjects = new Map<string, EnergyQuickProject>();
@@ -124,24 +129,6 @@ const mapProjectsToQuickOptions = (projects: Project[]) =>
     })),
   );
 
-const normalizeProjectLoadError = (error: unknown, hasFallbackProjects = false) => {
-  const fallbackMessage = '项目列表同步失败，已暂时使用默认项目。';
-
-  if (!(error instanceof Error)) {
-    return fallbackMessage;
-  }
-
-  if (
-    error.message.includes('HTML 页面') ||
-    error.message.includes('<!doctype') ||
-    error.message.includes('接口未返回 JSON')
-  ) {
-    return '当前站点未连接 Halo 后端接口，已暂时使用默认项目。';
-  }
-
-  return error.message || fallbackMessage;
-};
-
 const getProjectLoadErrorMessage = (error: unknown, hasFallbackProjects = false) => {
   const fallbackMessage = '项目列表同步失败。';
 
@@ -151,7 +138,12 @@ const getProjectLoadErrorMessage = (error: unknown, hasFallbackProjects = false)
 
   const message = error.message || '';
 
-  if (message.includes('<!doctype') || message.includes('<html') || message.includes('HTML') || message.includes('JSON')) {
+  if (
+    message.includes('<!doctype') ||
+    message.includes('<html') ||
+    message.includes('HTML') ||
+    message.includes('JSON')
+  ) {
     return hasFallbackProjects
       ? '当前站点未连接 Halo 后端接口，已回退到本地项目列表。'
       : '当前站点未连接 Halo 后端接口。';
@@ -163,13 +155,52 @@ const getProjectLoadErrorMessage = (error: unknown, hasFallbackProjects = false)
     message.includes('fetch failed')
   ) {
     return hasFallbackProjects
-      ? '龙湖项目接口握手失败，当前环境可能未接入内网或 VPN，已回退到本地项目列表。'
-      : '龙湖项目接口握手失败，当前环境可能未接入内网或 VPN。';
+      ? '项目接口握手失败，当前环境可能未接入内网或 VPN，已回退到本地项目列表。'
+      : '项目接口握手失败，当前环境可能未接入内网或 VPN。';
   }
 
-  const nextMessage = message || fallbackMessage;
-  return hasFallbackProjects ? `${nextMessage} 已回退到本地项目列表。` : nextMessage;
+  return hasFallbackProjects ? `${message} 已回退到本地项目列表。` : message || fallbackMessage;
 };
+
+const formatRelativeTime = (value: string) => {
+  const timestamp = Date.parse(value);
+
+  if (Number.isNaN(timestamp)) {
+    return '';
+  }
+
+  const diffInMinutes = Math.round((timestamp - Date.now()) / 60000);
+  const formatter = new Intl.RelativeTimeFormat('zh-CN', { numeric: 'auto' });
+
+  if (Math.abs(diffInMinutes) < 60) {
+    return formatter.format(diffInMinutes, 'minute');
+  }
+
+  const diffInHours = Math.round(diffInMinutes / 60);
+
+  if (Math.abs(diffInHours) < 24) {
+    return formatter.format(diffInHours, 'hour');
+  }
+
+  const diffInDays = Math.round(diffInHours / 24);
+
+  if (Math.abs(diffInDays) < 30) {
+    return formatter.format(diffInDays, 'day');
+  }
+
+  const diffInMonths = Math.round(diffInDays / 30);
+
+  if (Math.abs(diffInMonths) < 12) {
+    return formatter.format(diffInMonths, 'month');
+  }
+
+  return formatter.format(Math.round(diffInMonths / 12), 'year');
+};
+
+const sortHistorySessions = (sessions: ChatSessionSummary[]) =>
+  [...sessions].sort(
+    (left, right) => Date.parse(right.last_message_at) - Date.parse(left.last_message_at),
+  );
 
 const layoutSpringTransition = {
   damping: 28,
@@ -190,6 +221,8 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     timeRange: '今天',
   });
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [historySessions, setHistorySessions] = useState<ChatSessionSummary[]>([]);
   const [input, setInput] = useState('');
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(true);
   const [isThinking, setIsThinking] = useState(false);
@@ -199,10 +232,46 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const [projectsLoading, setProjectsLoading] = useState(false);
   const [selectedIntent, setSelectedIntent] = useState<QuickIntentId | null>(null);
   const [showIntentPanel, setShowIntentPanel] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(true);
+  const [historyError, setHistoryError] = useState('');
+  const [historyNotice, setHistoryNotice] = useState('');
+  const [loadingSessionId, setLoadingSessionId] = useState<string | null>(null);
+  const [isSessionSaving, setIsSessionSaving] = useState(false);
+  const [sessionSaveError, setSessionSaveError] = useState('');
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(null);
 
   const activeRequestRef = useRef<AbortController | null>(null);
+  const activeSessionIdRef = useRef<string | null>(null);
+  const requestRunIdRef = useRef(0);
   const composerRef = useRef<HTMLTextAreaElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const sessionStoreRef = useRef(createChatSessionStore());
+
+  const setCurrentSessionId = (sessionId: string | null) => {
+    activeSessionIdRef.current = sessionId;
+    setActiveSessionId(sessionId);
+  };
+
+  const syncHistoryNotice = () => {
+    setHistoryNotice(
+      sessionStoreRef.current.getMode() === 'local' ? historyFallbackNotice : '',
+    );
+  };
+
+  const upsertHistorySession = (session: ChatSession) => {
+    const summary = toChatSessionSummary(session);
+
+    setHistorySessions((previous) =>
+      sortHistorySessions([summary, ...previous.filter((item) => item.id !== summary.id)]),
+    );
+  };
+
+  const cancelActiveRun = () => {
+    requestRunIdRef.current += 1;
+    activeRequestRef.current?.abort();
+    activeRequestRef.current = null;
+    setIsThinking(false);
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -297,6 +366,43 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     };
   }, [hasLoadedProjects]);
 
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadHistorySessions = async () => {
+      setHistoryLoading(true);
+      setHistoryError('');
+
+      try {
+        const sessions = await sessionStoreRef.current.list();
+
+        if (!isMounted) {
+          return;
+        }
+
+        setHistorySessions(sortHistorySessions(sessions));
+        syncHistoryNotice();
+      } catch (error) {
+        if (!isMounted) {
+          return;
+        }
+
+        setHistorySessions([]);
+        setHistoryError(error instanceof Error ? error.message : '历史会话加载失败。');
+      } finally {
+        if (isMounted) {
+          setHistoryLoading(false);
+        }
+      }
+    };
+
+    void loadHistorySessions();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
   const textSecondary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
   const cardSurface = isDarkMode
@@ -309,19 +415,49 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     projectOptions[0]?.name ||
     '';
   const promptProjectName = currentProjectName || '项目';
-  const historyItems = useMemo(
-    () => createHistoryItems(promptProjectName),
-    [promptProjectName],
-  );
-
   const selectedIntentMeta = useMemo(
     () => quickIntents.find((intent) => intent.id === selectedIntent) ?? null,
     [selectedIntent],
   );
+  const activeHistorySession = useMemo(
+    () => historySessions.find((session) => session.id === activeSessionId) ?? null,
+    [activeSessionId, historySessions],
+  );
+  const statusTone = sessionSaveError ? 'text-rose-500' : textSecondary;
+  const conversationStatus = useMemo(() => {
+    if (sessionSaveError) {
+      return sessionSaveError;
+    }
 
-  const appendMessage = (message: ChatMessage) => {
-    setChatMessages((previous) => [...previous, message]);
-  };
+    if (isSessionSaving) {
+      return '当前会话保存中...';
+    }
+
+    if (isThinking) {
+      return 'AI 正在生成回复，内容会自动保存到历史会话。';
+    }
+
+    if (chatMessages.length === 0) {
+      return '点击“新建会话”开始新的对话，消息会自动保存到历史会话。';
+    }
+
+    if (lastSavedAt) {
+      return `已自动保存到历史会话 · ${formatRelativeTime(lastSavedAt) || '刚刚'}`;
+    }
+
+    if (activeHistorySession) {
+      return `当前会话：${activeHistorySession.title}`;
+    }
+
+    return '当前会话内容会自动保存到历史会话。';
+  }, [
+    activeHistorySession,
+    chatMessages.length,
+    isSessionSaving,
+    isThinking,
+    lastSavedAt,
+    sessionSaveError,
+  ]);
 
   const toggleThinking = (messageId: string) => {
     setChatMessages((previous) =>
@@ -347,6 +483,63 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     }));
   };
 
+  const persistConversation = async (
+    messages: ChatMessage[],
+    sessionId = activeSessionIdRef.current,
+  ) => {
+    if (messages.length === 0) {
+      return null;
+    }
+
+    setIsSessionSaving(true);
+    setSessionSaveError('');
+
+    try {
+      const payload: UpsertChatSessionPayload = {
+        messages: mapViewMessagesToSession(messages),
+        metadata: {
+          context: {
+            energyType: chatForm.energyType,
+            interval: chatForm.interval,
+            orgId: chatForm.orgId,
+            project: chatForm.project,
+            queryName: chatForm.queryName,
+            timeRange: chatForm.timeRange,
+          },
+          source: 'chat-workspace',
+        },
+      };
+
+      const session = sessionId
+        ? await sessionStoreRef.current.update(sessionId, payload)
+        : await sessionStoreRef.current.create(payload);
+
+      setCurrentSessionId(session.id);
+      setLastSavedAt(session.updated_at);
+      upsertHistorySession(session);
+      syncHistoryNotice();
+
+      return session;
+    } catch (error) {
+      setSessionSaveError(error instanceof Error ? error.message : '会话保存失败，请稍后重试。');
+      return null;
+    } finally {
+      setIsSessionSaving(false);
+    }
+  };
+
+  const handleCreateNewSession = () => {
+    cancelActiveRun();
+    setCurrentSessionId(null);
+    setChatMessages([]);
+    setInput('');
+    setSelectedIntent(null);
+    setShowIntentPanel(false);
+    setSessionSaveError('');
+    setLastSavedAt(null);
+    setLoadingSessionId(null);
+  };
+
   const handleSendChat = async () => {
     if (!input.trim() || isThinking) {
       return;
@@ -355,16 +548,37 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     const message = input.trim();
     const activeIntent = selectedIntent;
     const requestController = new AbortController();
+    const requestRunId = requestRunIdRef.current + 1;
+    let workingSessionId = activeSessionIdRef.current;
+
+    requestRunIdRef.current = requestRunId;
     activeRequestRef.current = requestController;
 
-    appendMessage({
+    const userMessage = createChatMessage({
       content: message,
-      id: createId(),
       role: 'user',
     });
+    const nextMessages = [...chatMessages, userMessage];
+
+    setChatMessages(nextMessages);
     setInput('');
     setSelectedIntent(null);
+    setShowIntentPanel(false);
     setIsThinking(true);
+    setSessionSaveError('');
+
+    const savedSessionAfterUserMessage = await persistConversation(
+      nextMessages,
+      workingSessionId,
+    );
+
+    if (savedSessionAfterUserMessage) {
+      workingSessionId = savedSessionAfterUserMessage.id;
+    }
+
+    if (requestRunId !== requestRunIdRef.current) {
+      return;
+    }
 
     try {
       let dataPreview: unknown = null;
@@ -380,6 +594,10 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
         const reportResponse = await queryEnergyReport(requestPayload, requestController.signal);
         dataPreview = reportResponse.data ?? null;
         upstreamStatus = reportResponse.upstreamStatus;
+      }
+
+      if (requestRunId !== requestRunIdRef.current) {
+        return;
       }
 
       const response = await api.chatWithAi(
@@ -400,28 +618,49 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
         requestController.signal,
       );
 
-      appendMessage({
+      if (requestRunId !== requestRunIdRef.current) {
+        return;
+      }
+
+      const assistantMessage = createChatMessage({
         content: response.reply,
-        id: createId(),
         role: 'assistant',
-        showThinking: false,
         thinking: response.thinking,
       });
-    } catch (error) {
-      if (!requestController.signal.aborted) {
-        appendMessage({
-          content: error instanceof Error ? error.message : 'AI 对话请求失败。',
-          id: createId(),
-          role: 'assistant',
-          showThinking: false,
-          thinking: '已终止模型请求，建议检查后端环境变量或网络状态。',
-        });
+      const finalMessages = [...nextMessages, assistantMessage];
+
+      setChatMessages(finalMessages);
+
+      const savedSessionAfterReply = await persistConversation(
+        finalMessages,
+        workingSessionId,
+      );
+
+      if (savedSessionAfterReply) {
+        workingSessionId = savedSessionAfterReply.id;
       }
+    } catch (error) {
+      if (requestController.signal.aborted || requestRunId !== requestRunIdRef.current) {
+        return;
+      }
+
+      const assistantMessage = createChatMessage({
+        content: error instanceof Error ? error.message : 'AI 对话请求失败。',
+        role: 'assistant',
+        thinking: '本次回复未能正常完成，建议检查后端环境变量或网络状态后重试。',
+      });
+      const failedMessages = [...nextMessages, assistantMessage];
+
+      setChatMessages(failedMessages);
+      await persistConversation(failedMessages, workingSessionId);
     } finally {
       if (activeRequestRef.current === requestController) {
         activeRequestRef.current = null;
       }
-      setIsThinking(false);
+
+      if (requestRunId === requestRunIdRef.current) {
+        setIsThinking(false);
+      }
     }
   };
 
@@ -430,17 +669,35 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       return;
     }
 
-    activeRequestRef.current?.abort();
-    activeRequestRef.current = null;
-    setIsThinking(false);
+    cancelActiveRun();
   };
 
-  const handleHistoryClick = (item: HistoryItem) => {
-    setChatMessages([
-      { content: item.userPrompt, id: createId(), role: 'user' },
-      { content: item.assistantReply, id: createId(), role: 'assistant', showThinking: false },
-    ]);
-    setSelectedIntent(null);
+  const handleHistoryClick = async (sessionId: string) => {
+    if (loadingSessionId === sessionId) {
+      return;
+    }
+
+    cancelActiveRun();
+    setLoadingSessionId(sessionId);
+    setHistoryError('');
+    setSessionSaveError('');
+
+    try {
+      const session = await sessionStoreRef.current.get(sessionId);
+
+      setChatMessages(mapSessionMessagesToView(session.messages));
+      setCurrentSessionId(session.id);
+      setSelectedIntent(null);
+      setShowIntentPanel(false);
+      setInput('');
+      setLastSavedAt(session.updated_at);
+      upsertHistorySession(session);
+      syncHistoryNotice();
+    } catch (error) {
+      setHistoryError(error instanceof Error ? error.message : '历史会话加载失败。');
+    } finally {
+      setLoadingSessionId(null);
+    }
   };
 
   const handleComposerKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -462,19 +719,31 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
         transition={layoutSpringTransition}
         className={`flex min-h-0 flex-1 flex-col overflow-hidden rounded-[28px] border shadow-sm ${cardSurface}`}
       >
-        <div className="flex shrink-0 items-center justify-between px-5 py-5">
+        <div className="flex shrink-0 flex-col gap-4 px-5 py-5 lg:flex-row lg:items-start lg:justify-between">
           <div>
             <h2 className={`text-xl font-black tracking-tight ${textPrimary}`}>对话工作台</h2>
+            <p className={`mt-1 text-sm ${statusTone}`}>{conversationStatus}</p>
           </div>
-          {!isHistoryExpanded && (
+
+          <div className="flex flex-wrap items-center gap-3">
             <button
-              onClick={() => setIsHistoryExpanded(true)}
-              className={`inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-4 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
+              onClick={handleCreateNewSession}
+              className="inline-flex items-center gap-2 whitespace-nowrap rounded-2xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
             >
-              <ChevronLeft size={16} />
-              展开历史
+              <Plus size={16} />
+              新建会话
             </button>
-          )}
+
+            {!isHistoryExpanded && (
+              <button
+                onClick={() => setIsHistoryExpanded(true)}
+                className={`inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-4 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
+              >
+                <ChevronLeft size={16} />
+                展开历史
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="flex min-h-0 flex-1 flex-col px-5 pb-5">
@@ -483,7 +752,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               <div className="flex h-full min-h-[200px] flex-col items-center justify-center text-center">
                 <h3 className={`text-2xl font-black tracking-tight ${textPrimary}`}>Halo · 云境</h3>
                 <p className={`mt-2 max-w-xl text-sm leading-6 ${textSecondary}`}>
-                  输入问题后即可开始对话，点击输入框也会显示常用快捷意图。
+                  输入问题即可开始对话。发送后的内容会自动保存到历史会话，你也可以随时点击右上角创建新的会话。
                 </p>
               </div>
             ) : (
@@ -657,14 +926,16 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
               <div className="flex gap-3">
                 <button
                   onClick={handleStopChat}
-                  className={`inline-flex items-center justify-center gap-2 rounded-[20px] border px-4 py-2.5 text-sm font-bold ${cardSurface} ${textPrimary}`}
+                  disabled={!isThinking}
+                  className={`inline-flex items-center justify-center gap-2 rounded-[20px] border px-4 py-2.5 text-sm font-bold disabled:cursor-not-allowed disabled:opacity-60 ${cardSurface} ${textPrimary}`}
                 >
                   <Square size={15} />
                   停止
                 </button>
                 <button
                   onClick={() => void handleSendChat()}
-                  className="inline-flex items-center justify-center gap-2 rounded-[20px] bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
+                  disabled={!input.trim() || isThinking}
+                  className="inline-flex items-center justify-center gap-2 rounded-[20px] bg-slate-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-60 dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100"
                 >
                   <Send size={15} />
                   发送
@@ -685,39 +956,76 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
             transition={layoutSpringTransition}
             className="min-h-0 xl:w-[300px] xl:flex-none"
           >
-            <div className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border p-5 shadow-sm ${cardSurface}`}>
-          <div className="flex shrink-0 items-center justify-between">
-            <div>
-              <h3 className={`text-lg font-black ${textPrimary}`}>历史对话</h3>
-              <p className={`mt-1 text-sm ${textSecondary}`}>保留最近常用的工作记录。</p>
-            </div>
-            <div className="flex items-center gap-2">
-              <div className={`rounded-2xl p-3 ${mutedSurface}`}>
-                <Clock3 size={18} className={isDarkMode ? 'text-slate-200' : 'text-slate-600'} />
+            <div
+              className={`flex h-full min-h-0 flex-col overflow-hidden rounded-[28px] border p-5 shadow-sm ${cardSurface}`}
+            >
+              <div className="flex shrink-0 items-center justify-between gap-3">
+                <div>
+                  <h3 className={`text-lg font-black ${textPrimary}`}>历史对话</h3>
+                  <p className={`mt-1 text-sm ${textSecondary}`}>当前会话会自动保存到这里。</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className={`rounded-2xl p-3 ${mutedSurface}`}>
+                    <Clock3 size={18} className={isDarkMode ? 'text-slate-200' : 'text-slate-600'} />
+                  </div>
+                  <button
+                    onClick={() => setIsHistoryExpanded(false)}
+                    className={`inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-3.5 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
+                  >
+                    <ChevronRight size={16} />
+                    收起历史
+                  </button>
+                </div>
               </div>
-              <button
-                onClick={() => setIsHistoryExpanded(false)}
-                className={`inline-flex items-center gap-2 whitespace-nowrap rounded-2xl border px-3.5 py-2 text-sm font-semibold ${cardSurface} ${textPrimary}`}
-              >
-                <ChevronRight size={16} />
-                收起历史
-              </button>
-            </div>
-          </div>
 
-          <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
-            {historyItems.map((item) => (
-              <button
-                key={item.id}
-                onClick={() => handleHistoryClick(item)}
-                className={`w-full rounded-[22px] border p-4 text-left transition hover:-translate-y-0.5 ${cardSurface}`}
-              >
-                <div className={`text-sm font-bold ${textPrimary}`}>{item.title}</div>
-                <div className={`mt-1 text-xs leading-5 ${textSecondary}`}>{item.summary}</div>
-                <div className="mt-3 text-xs text-slate-400">{item.time}</div>
-              </button>
-            ))}
-          </div>
+              {historyNotice && (
+                <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/8 px-3 py-2 text-xs leading-5 text-amber-600">
+                  {historyNotice}
+                </div>
+              )}
+
+              {historyError && (
+                <div className="mt-4 rounded-2xl border border-rose-500/20 bg-rose-500/8 px-3 py-2 text-xs leading-5 text-rose-500">
+                  {historyError}
+                </div>
+              )}
+
+              <div className="mt-4 min-h-0 flex-1 space-y-3 overflow-y-auto pr-1">
+                {historyLoading ? (
+                  <div className={`rounded-[22px] border p-4 text-sm ${cardSurface} ${textSecondary}`}>
+                    正在加载历史会话...
+                  </div>
+                ) : historySessions.length === 0 ? (
+                  <div className={`rounded-[22px] border p-4 text-sm leading-6 ${cardSurface} ${textSecondary}`}>
+                    还没有历史会话。发送第一条消息后，当前对话会自动保存到这里。
+                  </div>
+                ) : (
+                  historySessions.map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => void handleHistoryClick(item.id)}
+                      disabled={loadingSessionId === item.id}
+                      className={`w-full rounded-[22px] border p-4 text-left transition hover:-translate-y-0.5 disabled:cursor-wait ${
+                        item.id === activeSessionId
+                          ? isDarkMode
+                            ? 'border-white/20 bg-white/10'
+                            : 'border-slate-900/10 bg-slate-100'
+                          : cardSurface
+                      }`}
+                    >
+                      <div className={`text-sm font-bold ${textPrimary}`}>{item.title}</div>
+                      <div className={`mt-1 text-xs leading-5 ${textSecondary}`}>
+                        {item.summary || '暂无摘要'}
+                      </div>
+                      <div className="mt-3 text-xs text-slate-400">
+                        {loadingSessionId === item.id
+                          ? '加载中...'
+                          : formatRelativeTime(item.last_message_at) || '刚刚'}
+                      </div>
+                    </button>
+                  ))
+                )}
+              </div>
             </div>
           </motion.aside>
         )}

@@ -338,6 +338,35 @@ const run = async () => {
           },
         ];
       });
+      const queryRecordRows = chunk.flatMap((record) => {
+        const projectId = projectIdByCode.get(record.projectCode);
+
+        if (!projectId) {
+          return [];
+        }
+
+        return [
+          {
+            energy_path: record.energyPath,
+            granularity: 'day',
+            meter_name: record.meterName,
+            meter_number: record.meterNumber,
+            meter_type: 'electricity',
+            metadata: {
+              importSource: 'energy-report-import',
+              unit: 'kWh',
+            },
+            org_id: record.projectCode,
+            organization_path: record.organizationPath,
+            project_code: record.projectCode,
+            project_id: projectId,
+            project_name: record.projectName,
+            sample_date: record.sampleDate,
+            source_file: record.sourceFile,
+            usage_kwh: record.usageKwh,
+          },
+        ];
+      });
 
       const { error: metricUpsertError } = await supabase
         .from('energy_metrics')
@@ -347,6 +376,16 @@ const run = async () => {
 
       if (metricUpsertError) {
         throw new Error(metricUpsertError.message);
+      }
+
+      const { error: queryRecordUpsertError } = await supabase
+        .from('energy_query_records')
+        .upsert(queryRecordRows, {
+          onConflict: 'project_id,meter_number,sample_date,granularity,meter_type',
+        });
+
+      if (queryRecordUpsertError) {
+        throw new Error(queryRecordUpsertError.message);
       }
     }
   } catch (error) {

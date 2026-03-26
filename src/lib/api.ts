@@ -215,6 +215,36 @@ export type AiChatResponse = {
   usedFallback: boolean;
 };
 
+export type ChatSessionMessage = {
+  content: string;
+  createdAt?: string;
+  id: string;
+  role: 'assistant' | 'user';
+  thinking?: string;
+};
+
+export type ChatSession = {
+  created_at: string;
+  id: string;
+  last_message_at: string;
+  metadata: Record<string, unknown>;
+  messages: ChatSessionMessage[];
+  status: string;
+  summary: string;
+  title: string;
+  updated_at: string;
+};
+
+export type ChatSessionSummary = Omit<ChatSession, 'messages'>;
+
+export type UpsertChatSessionPayload = {
+  messages: ChatSessionMessage[];
+  metadata?: Record<string, unknown>;
+  status?: string;
+  summary?: string;
+  title?: string;
+};
+
 export type GenerateArtifactPayload = {
   artifactType: 'app' | 'widget';
   goal?: string;
@@ -246,6 +276,12 @@ export const api = {
       method: 'POST',
       signal,
     }),
+  createChatSession: (payload: UpsertChatSessionPayload, signal?: AbortSignal) =>
+    request<{ session: ChatSession }>('/api/chat/sessions', {
+      body: JSON.stringify(payload),
+      method: 'POST',
+      signal,
+    }),
   createIntegration: (payload: CreateIntegrationPayload) =>
     request<{ integration: Integration }>('/api/integrations', {
       body: JSON.stringify(payload),
@@ -266,6 +302,13 @@ export const api = {
   getEnergyQuickProjects: (signal?: AbortSignal) =>
     request<{ projects: EnergyQuickProject[] }>('/api/energy/quick-projects', { signal }),
   getHealth: () => request<HealthResponse>('/api/health'),
+  getChatSession: (sessionId: string, signal?: AbortSignal) =>
+    request<{ session: ChatSession }>(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}`,
+      { signal },
+    ),
+  getChatSessions: (signal?: AbortSignal) =>
+    request<{ sessions: ChatSessionSummary[] }>('/api/chat/sessions', { signal }),
   getIntegrations: (projectCode?: string) =>
     request<{ integrations: Integration[] }>(
       `/api/integrations${
@@ -278,5 +321,18 @@ export const api = {
       `/api/reports${
         projectCode ? `?projectCode=${encodeURIComponent(projectCode)}` : ''
       }`,
+    ),
+  updateChatSession: (
+    sessionId: string,
+    payload: UpsertChatSessionPayload,
+    signal?: AbortSignal,
+  ) =>
+    request<{ session: ChatSession }>(
+      `/api/chat/sessions/${encodeURIComponent(sessionId)}`,
+      {
+        body: JSON.stringify(payload),
+        method: 'PATCH',
+        signal,
+      },
     ),
 };

@@ -495,10 +495,6 @@ const loadImportedProjectRows = async () => {
     return (data ?? []).filter((row) => isImportedEnergyProject(row));
 };
 export const listImportedEnergyProjects = async () => {
-    const localData = readLocalImportedEnergyData();
-    if (localData && localData.projects.length > 0) {
-        return localData.projects;
-    }
     try {
         const rows = await loadImportedProjectRows();
         if (rows.length > 0) {
@@ -526,30 +522,6 @@ export const queryImportedEnergyReport = async (payload) => {
     const pageNum = parsePositiveInteger(payload.pageNum, 1);
     const pageSize = Math.min(parsePositiveInteger(payload.pageSize, 20), 200);
     const requestedGranularity = parsePositiveInteger(payload.queryType, 2) === 1 ? 'hour' : 'day';
-    const localData = readLocalImportedEnergyData();
-    if (localData && localData.projects.length > 0) {
-        const localProject = orgId
-            ? localData.projects.find((project) => project.orgId === orgId)
-            : localData.projects[0];
-        const scopedLocalRows = orgId && !localProject
-            ? []
-            : localData.records.filter((row) => !localProject || row.org_id === localProject.orgId);
-        const filteredRows = scopedLocalRows
-            .filter((row) => row.meter_type === meterType)
-            .filter((row) => (!startDate || row.sample_date >= startDate) &&
-            (!endDate || row.sample_date <= endDate))
-            .filter((row) => matchesImportedEnergyQuery(row, payload.queryName));
-        return buildImportedEnergyReportResponse(filteredRows, {
-            endDate,
-            meterType,
-            orgId: localProject?.orgId ?? orgId,
-            pageNum,
-            pageSize,
-            projectName: localProject?.projectName ?? '',
-            requestedGranularity,
-            startDate,
-        });
-    }
     try {
         const supabase = getSupabase();
         const importedProjects = await loadImportedProjectRows();
@@ -557,21 +529,34 @@ export const queryImportedEnergyReport = async (payload) => {
             ? importedProjects.find((item) => item.code === orgId)
             : importedProjects[0];
         if (project) {
-            const { data, error } = await supabase
-                .from('energy_metrics')
-                .select('metric_at, energy_type, source, usage_kwh, metadata')
-                .eq('project_id', project.id)
-                .eq('energy_type', meterType)
-                .order('metric_at', { ascending: false })
-                .order('usage_kwh', { ascending: false });
-            if (error) {
-                throw error;
+            const remoteRows = [];
+            const batchSize = 1000;
+            for (let offset = 0;; offset += batchSize) {
+                let query = supabase
+                    .from('energy_query_records')
+                    .select('project_code, project_name, org_id, organization_path, energy_path, meter_name, meter_number, sample_date, granularity, meter_type, usage_kwh, source_file, metadata')
+                    .eq('project_id', project.id)
+                    .eq('meter_type', meterType)
+                    .order('sample_date', { ascending: false })
+                    .order('usage_kwh', { ascending: false })
+                    .range(offset, offset + batchSize - 1);
+                if (startDate) {
+                    query = query.gte('sample_date', startDate);
+                }
+                if (endDate) {
+                    query = query.lte('sample_date', endDate);
+                }
+                const { data, error } = await query;
+                if (error) {
+                    throw error;
+                }
+                const chunk = (data ?? []);
+                remoteRows.push(...chunk);
+                if (chunk.length < batchSize) {
+                    break;
+                }
             }
-            const filteredRows = (data ?? [])
-                .filter((row) => normalizeStringValue(row.metadata?.importSource) === 'energy-report-import')
-                .map((row) => toImportedEnergyQueryRow(row, project))
-                .filter((row) => (!startDate || row.sample_date >= startDate) &&
-                (!endDate || row.sample_date <= endDate))
+            const filteredRows = remoteRows
                 .filter((row) => matchesImportedEnergyQuery(row, payload.queryName));
             return buildImportedEnergyReportResponse(filteredRows, {
                 endDate,
@@ -588,6 +573,7 @@ export const queryImportedEnergyReport = async (payload) => {
     catch {
         // Fall back to local imported data when Supabase schema is unavailable.
     }
+    const localData = readLocalImportedEnergyData();
     const localProject = orgId
         ? localData?.projects.find((project) => project.orgId === orgId)
         : localData?.projects[0];

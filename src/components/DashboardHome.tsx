@@ -1,15 +1,14 @@
 import React, { useMemo, useState, type CSSProperties } from 'react';
 import {
-  Activity,
   BarChart3,
   Bolt,
   GripVertical,
   LayoutTemplate,
+  Leaf,
   ListTodo,
   Plus,
-  ShieldCheck,
   Sparkles,
-  Target,
+  SunMedium,
   Trash2,
   WandSparkles,
   X,
@@ -30,156 +29,78 @@ type DragPayload =
   | { type: 'canvas'; widgetId: string };
 
 type WidgetCardMode = 'board' | 'preview';
-type WidgetTone = 'amber' | 'blue' | 'cyan' | 'emerald' | 'slate' | 'violet';
 
-type WidgetPaletteDefinition = {
-  chipLabel: string;
-  icon: LucideIcon;
-  tone: WidgetTone;
+type WidgetTheme = {
+  cardSurface: string;
+  chipSurface: string;
+  line: string;
+  panelSurface: string;
+  textMuted: string;
+  textPrimary: string;
+  textSecondary: string;
+  toolbarSurface: string;
+  trackSurface: string;
 };
 
-type WidgetPalette = WidgetPaletteDefinition & {
-  barFillClass: string;
-  dotClass: string;
-  glowClass: string;
-  iconWrapClass: string;
-  itemIconClass: string;
-  pillClass: string;
-};
-
-const sizeButtonOptions: WidgetSize[] = ['small', 'medium', 'large'];
-
-const widgetHeightClassMap: Record<WidgetSize, string> = {
-  large: 'min-h-[220px] md:aspect-[2.12/1] md:h-auto',
-  medium: 'min-h-[204px] md:aspect-[2.12/1] md:h-auto',
-  small: 'min-h-[204px] md:aspect-square md:h-auto',
-};
-
-const widgetTitleClassMap: Record<WidgetSize, string> = {
-  large: 'text-[22px]',
-  medium: 'text-[18px]',
-  small: 'text-[16px]',
-};
-
-const widgetMetricClassMap: Record<WidgetSize, string> = {
-  large: 'text-[36px]',
-  medium: 'text-[30px]',
-  small: 'text-[24px]',
-};
-
-const widgetItemLimitMap: Record<WidgetSize, number> = {
-  large: 3,
-  medium: 2,
-  small: 1,
-};
-
-const widgetHelperLineClampMap: Record<WidgetSize, number> = {
-  large: 2,
-  medium: 2,
-  small: 1,
-};
-
-const widgetDescriptionLineClampMap: Record<WidgetSize, number> = {
-  large: 2,
-  medium: 1,
-  small: 0,
-};
-
-const sizeDescriptionMap: Record<WidgetSize, string> = {
-  large: '整行展示，适合综合摘要、图表或诊断卡片',
-  medium: '半行布局，适合重点提示与双列信息',
-  small: '轻量指标卡，适合数字、状态和快速结论',
-};
-
-const widgetPaletteMap: Record<string, WidgetPaletteDefinition> = {
-  'widget-energy': { chipLabel: '能耗脉冲', icon: Bolt, tone: 'cyan' },
-  'widget-integration': { chipLabel: '链路健康', icon: ShieldCheck, tone: 'emerald' },
-  'widget-focus': { chipLabel: '优先事项', icon: Target, tone: 'violet' },
-  'widget-breakdown': { chipLabel: '结构分析', icon: BarChart3, tone: 'amber' },
-  'widget-actions': { chipLabel: '执行清单', icon: ListTodo, tone: 'slate' },
-  'widget-rhythm': { chipLabel: '运行节奏', icon: Activity, tone: 'blue' },
-};
-
-type WidgetVisualDefinition = {
-  bars: number[];
-  icons: LucideIcon[];
-};
-
-type DashboardWidgetCardProps = {
-  highlight?: boolean;
+type WidgetBodyProps = {
   isDarkMode: boolean;
-  mode: WidgetCardMode;
-  onRemove?: () => void;
+  theme: WidgetTheme;
   widget: DashboardWidget;
 };
 
-const widgetVisualBarLimitMap: Record<WidgetSize, number> = {
-  large: 6,
-  medium: 5,
-  small: 4,
+const sizeButtonOptions: WidgetSize[] = ['1:1', '2:1', '2:2'];
+
+const dashboardGridClassName =
+  'grid grid-cols-1 gap-5 md:auto-rows-[220px] md:grid-cols-6 xl:grid-cols-12';
+
+const widgetMobileHeightClassMap: Record<WidgetSize, string> = {
+  '1:1': 'min-h-[320px]',
+  '2:1': 'min-h-[280px]',
+  '2:2': 'min-h-[520px]',
 };
 
-const widgetVisualIconLimitMap: Record<WidgetSize, number> = {
-  large: 3,
-  medium: 3,
-  small: 2,
+const sizeDescriptionMap: Record<WidgetSize, string> = {
+  '1:1': '方形卡片，适合占比、排行和状态监控。',
+  '2:1': '横向卡片，适合总览指标、趋势和综合摘要。',
+  '2:2': '双高卡片，适合复杂图表、诊断或多段信息。',
 };
 
-const widgetVisualPaddingClassMap: Record<WidgetSize, string> = {
-  large: 'p-3.5',
-  medium: 'p-3',
-  small: 'p-2.5',
-};
+const energySparkBars = [28, 42, 58, 86, 100, 76, 52];
 
-const widgetVisualHeightClassMap: Record<WidgetSize, string> = {
-  large: 'h-16',
-  medium: 'h-14',
-  small: 'h-12',
-};
+const powerCompositionData = [
+  { color: '#18b7d4', label: '商户租户', value: 60 },
+  { color: '#d8e1ea', label: '公共区域', value: 40 },
+];
 
-const widgetVisualBadgeClassMap: Record<WidgetSize, string> = {
-  large: 'h-9 w-9 rounded-[16px]',
-  medium: 'h-8 w-8 rounded-[14px]',
-  small: 'h-7 w-7 rounded-[12px]',
-};
+const systemRankingData = [
+  { label: '空调系统', value: 45 },
+  { label: '照明系统', value: 22 },
+  { label: '动力系统', value: 18 },
+  { label: '办公插座', value: 15 },
+];
 
-const widgetVisualBarWidthClassMap: Record<WidgetSize, string> = {
-  large: 'w-3',
-  medium: 'w-3',
-  small: 'w-2.5',
-};
+const multiEnergySeries = [
+  { electric: 74, gas: 12, time: '00:00', water: 24 },
+  { electric: 68, gas: 12, time: '04:00', water: 30 },
+  { electric: 86, gas: 6, time: '08:00', water: 18 },
+  { electric: 60, gas: 18, time: '12:00', water: 30 },
+  { electric: 80, gas: 12, time: '16:00', water: 18 },
+  { electric: 92, gas: 6, time: '20:00', water: 12 },
+];
 
-const widgetItemIconSizeMap: Record<WidgetSize, number> = {
-  large: 14,
-  medium: 13,
-  small: 12,
-};
+const multiEnergyLegend = [
+  { color: '#0f7a8d', key: 'electric', label: '电能' },
+  { color: '#18b7d4', key: 'water', label: '水能' },
+  { color: '#f4a340', key: 'gas', label: '燃气' },
+] as const;
 
-const widgetVisualMap: Record<string, WidgetVisualDefinition> = {
-  'widget-energy': {
-    bars: [34, 56, 78, 62, 88, 70],
-    icons: [Bolt, Activity, BarChart3],
-  },
-  'widget-integration': {
-    bars: [80, 72, 86, 78, 90, 84],
-    icons: [ShieldCheck, Sparkles, Activity],
-  },
-  'widget-focus': {
-    bars: [68, 44, 76, 58, 40, 72],
-    icons: [Target, Sparkles, ListTodo],
-  },
-  'widget-breakdown': {
-    bars: [82, 64, 52, 74, 60, 48],
-    icons: [BarChart3, Bolt, Activity],
-  },
-  'widget-actions': {
-    bars: [40, 58, 72, 66, 80, 88],
-    icons: [ListTodo, Target, Sparkles],
-  },
-  'widget-rhythm': {
-    bars: [48, 62, 56, 74, 60, 70],
-    icons: [Activity, BarChart3, Sparkles],
-  },
+const widgetIconMap: Record<string, LucideIcon> = {
+  'widget-actions': ListTodo,
+  'widget-breakdown': BarChart3,
+  'widget-energy': Bolt,
+  'widget-focus': BarChart3,
+  'widget-integration': SunMedium,
+  'widget-rhythm': Leaf,
 };
 
 const clampTextStyle = (lines: number): CSSProperties =>
@@ -239,85 +160,439 @@ const upsertWidgetId = (widgetIds: string[], widgetId: string, targetIndex: numb
   return moveItem(widgetIds, currentIndex, clampedTargetIndex);
 };
 
-const getWidgetPalette = (widget: DashboardWidget, isDarkMode: boolean): WidgetPalette => {
-  const definition =
-    widgetPaletteMap[widget.id] ??
-    ({
-      chipLabel: widget.category === 'custom' ? 'AI 定制' : '系统模块',
-      icon: widget.category === 'custom' ? WandSparkles : Sparkles,
-      tone: widget.category === 'custom' ? 'blue' : 'slate',
-    } satisfies WidgetPaletteDefinition);
+const getWidgetIcon = (widget: DashboardWidget) =>
+  widgetIconMap[widget.id] ?? (widget.category === 'custom' ? WandSparkles : Sparkles);
 
-  switch (definition.tone) {
-    case 'amber':
-      return {
-        ...definition,
-        barFillClass: 'bg-amber-400/85',
-        dotClass: 'bg-amber-400',
-        glowClass: 'bg-amber-300/20',
-        iconWrapClass: isDarkMode ? 'bg-amber-400/16 text-amber-200' : 'bg-amber-100 text-amber-700',
-        itemIconClass: isDarkMode ? 'text-amber-200' : 'text-amber-700',
-        pillClass: isDarkMode ? 'bg-amber-400/14 text-amber-100' : 'bg-amber-50 text-amber-700',
-      };
-    case 'blue':
-      return {
-        ...definition,
-        barFillClass: 'bg-blue-400/85',
-        dotClass: 'bg-blue-400',
-        glowClass: 'bg-blue-400/18',
-        iconWrapClass: isDarkMode ? 'bg-blue-400/16 text-blue-200' : 'bg-blue-100 text-blue-700',
-        itemIconClass: isDarkMode ? 'text-blue-200' : 'text-blue-700',
-        pillClass: isDarkMode ? 'bg-blue-400/14 text-blue-100' : 'bg-blue-50 text-blue-700',
-      };
-    case 'cyan':
-      return {
-        ...definition,
-        barFillClass: 'bg-cyan-400/85',
-        dotClass: 'bg-cyan-400',
-        glowClass: 'bg-cyan-300/20',
-        iconWrapClass: isDarkMode ? 'bg-cyan-400/16 text-cyan-200' : 'bg-cyan-100 text-cyan-700',
-        itemIconClass: isDarkMode ? 'text-cyan-200' : 'text-cyan-700',
-        pillClass: isDarkMode ? 'bg-cyan-400/14 text-cyan-100' : 'bg-cyan-50 text-cyan-700',
-      };
-    case 'emerald':
-      return {
-        ...definition,
-        barFillClass: 'bg-emerald-400/85',
-        dotClass: 'bg-emerald-400',
-        glowClass: 'bg-emerald-300/20',
-        iconWrapClass: isDarkMode ? 'bg-emerald-400/16 text-emerald-200' : 'bg-emerald-100 text-emerald-700',
-        itemIconClass: isDarkMode ? 'text-emerald-200' : 'text-emerald-700',
-        pillClass: isDarkMode ? 'bg-emerald-400/14 text-emerald-100' : 'bg-emerald-50 text-emerald-700',
-      };
-    case 'violet':
-      return {
-        ...definition,
-        barFillClass: 'bg-violet-400/85',
-        dotClass: 'bg-violet-400',
-        glowClass: 'bg-violet-300/20',
-        iconWrapClass: isDarkMode ? 'bg-violet-400/16 text-violet-200' : 'bg-violet-100 text-violet-700',
-        itemIconClass: isDarkMode ? 'text-violet-200' : 'text-violet-700',
-        pillClass: isDarkMode ? 'bg-violet-400/14 text-violet-100' : 'bg-violet-50 text-violet-700',
-      };
-    case 'slate':
+const getWidgetTheme = (isDarkMode: boolean): WidgetTheme => ({
+  cardSurface: isDarkMode
+    ? 'border-white/10 bg-slate-900/88 shadow-[0_34px_90px_-54px_rgba(2,6,23,0.96)]'
+    : 'border-white/90 bg-white shadow-[0_34px_90px_-54px_rgba(15,23,42,0.28)]',
+  chipSurface: isDarkMode ? 'border-white/10 bg-white/[0.05]' : 'border-slate-200/80 bg-[#f5f8fc]',
+  line: isDarkMode ? 'border-white/10' : 'border-slate-200',
+  panelSurface: isDarkMode ? 'bg-white/[0.05]' : 'bg-[#f4f7fb]',
+  textMuted: isDarkMode ? 'text-slate-400' : 'text-slate-500',
+  textPrimary: isDarkMode ? 'text-slate-100' : 'text-[#1b1f24]',
+  textSecondary: isDarkMode ? 'text-slate-300' : 'text-slate-600',
+  toolbarSurface: isDarkMode
+    ? 'border-white/10 bg-slate-950/78 text-slate-100'
+    : 'border-white/90 bg-white/92 text-slate-600',
+  trackSurface: isDarkMode ? 'bg-white/[0.08]' : 'bg-[#dbe5ee]',
+});
+
+const RatioPreview = ({ isDarkMode, size }: { isDarkMode: boolean; size: WidgetSize }) => {
+  const blockClassName =
+    size === '1:1' ? 'h-10 w-10' : size === '2:1' ? 'h-8 w-14' : 'h-12 w-14';
+
+  return (
+    <div
+      className={`inline-flex h-14 w-20 items-center justify-center rounded-[18px] border ${
+        isDarkMode ? 'border-white/10 bg-slate-950/55' : 'border-slate-200 bg-white'
+      }`}
+    >
+      <div className={`rounded-[12px] bg-gradient-to-r from-cyan-500 to-sky-400 ${blockClassName}`} />
+    </div>
+  );
+};
+
+const DonutGauge = ({
+  isDarkMode,
+  label,
+  percentage,
+}: {
+  isDarkMode: boolean;
+  label: string;
+  percentage: number;
+}) => {
+  const angle = percentage * 3.6;
+  const ringStyle: CSSProperties = {
+    background: `conic-gradient(#18b7d4 0deg ${angle}deg, ${
+      isDarkMode ? 'rgba(148,163,184,0.22)' : '#e2e8f0'
+    } ${angle}deg 360deg)`,
+  };
+
+  return (
+    <div className="relative mx-auto h-40 w-40">
+      <div className="absolute inset-0 rounded-full" style={ringStyle} />
+      <div
+        className="absolute inset-[18px] rounded-full"
+        style={{ backgroundColor: isDarkMode ? '#0f172a' : '#ffffff' }}
+      />
+      <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
+        <div className={`text-[22px] font-black leading-none ${isDarkMode ? 'text-slate-100' : 'text-slate-900'}`}>
+          {percentage}%
+        </div>
+        <div className={`mt-1 text-sm ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{label}</div>
+      </div>
+    </div>
+  );
+};
+
+const WidgetToolbar = ({ theme, onRemove }: { theme: WidgetTheme; onRemove?: () => void }) => (
+  <div className="absolute right-4 top-4 z-20 flex items-center gap-2">
+    <div className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border ${theme.toolbarSurface}`}>
+      <GripVertical size={16} />
+    </div>
+    {onRemove && (
+      <button
+        aria-label="移出看板"
+        type="button"
+        onClick={onRemove}
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl border transition hover:text-rose-500 ${theme.toolbarSurface}`}
+      >
+        <X size={16} />
+      </button>
+    )}
+  </div>
+);
+
+const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
+  const isSquare = widget.size === '1:1';
+  const isTall = widget.size === '2:2';
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className={`flex ${isSquare ? 'flex-col items-start gap-4' : 'items-start justify-between gap-4'}`}>
+        <div className="inline-flex items-center gap-3">
+          <span
+            className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${
+              isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
+            }`}
+          >
+            <Bolt size={20} />
+          </span>
+          <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-[26px] border px-5 py-4 pr-8 sm:min-w-[160px]">
+          <div className="absolute -right-4 -top-3 h-24 w-24 rounded-[28px] bg-cyan-300/20" />
+          <div className={`relative text-sm ${theme.textMuted}`}>峰值负荷</div>
+          <div className="relative mt-2 text-[18px] font-black text-cyan-600">
+            5,240
+            <span className={`ml-1 text-base font-semibold ${theme.textSecondary}`}>kW</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-8 flex flex-1 flex-col justify-between gap-6">
+        <div className="flex items-end gap-3">
+          <div
+            className={`font-black leading-none tracking-[-0.06em] ${theme.textPrimary} ${
+              isSquare ? 'text-[46px]' : isTall ? 'text-[58px] md:text-[74px]' : 'text-[54px] md:text-[72px]'
+            }`}
+          >
+            42,850.4
+          </div>
+          <div className={`pb-2 text-[22px] ${theme.textMuted}`}>kWh</div>
+        </div>
+
+        <div
+          className={`grid gap-4 border-t pt-5 ${theme.line} ${
+            isSquare ? '' : 'sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto]'
+          }`}
+        >
+          <div>
+            <div className={`text-sm ${theme.textMuted}`}>昨日同期对比</div>
+            <div className="mt-2 text-[15px] font-bold text-rose-500">+3.2%</div>
+          </div>
+
+          <div>
+            <div className={`text-sm ${theme.textMuted}`}>平均小时能耗</div>
+            <div className={`mt-2 text-[15px] font-bold ${theme.textPrimary}`}>3,570 kWh</div>
+          </div>
+
+          <div className={`flex items-end gap-1.5 ${isSquare ? 'justify-start' : 'justify-end'}`}>
+            {energySparkBars.map((height, index) => (
+              <span
+                key={`energy-bar-${index}`}
+                className={`relative flex h-16 w-2.5 items-end overflow-hidden rounded-full ${theme.trackSurface}`}
+              >
+                <span
+                  className={`w-full rounded-full ${
+                    index === 4 ? 'bg-cyan-500' : isDarkMode ? 'bg-slate-500/70' : 'bg-slate-300'
+                  }`}
+                  style={{ height: `${height}%` }}
+                />
+              </span>
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const PowerCompositionCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
+  const isSquare = widget.size === '1:1';
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="inline-flex items-center gap-3">
+        <span
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+            isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
+          }`}
+        >
+          <BarChart3 size={18} />
+        </span>
+        <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+      </div>
+
+      <div className={`mt-6 flex flex-1 flex-col ${isSquare ? '' : 'justify-center'}`}>
+        <DonutGauge isDarkMode={isDarkMode} label="租户用电" percentage={60} />
+
+        <div className="mt-6 space-y-3">
+          {powerCompositionData.map((item) => (
+            <div key={item.label} className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <span className="h-3 w-3 rounded-full" style={{ backgroundColor: item.color }} />
+                <span className={`text-[15px] ${theme.textSecondary}`}>{item.label}</span>
+              </div>
+              <span className={`text-[15px] font-semibold ${theme.textPrimary}`}>{item.value}%</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SolarPowerCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col">
+    <div className="absolute inset-x-0 top-0 h-1.5 bg-cyan-500" />
+
+    <div className="flex items-start justify-between gap-3">
+      <div className="inline-flex items-center gap-3">
+        <span
+          className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+            isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
+          }`}
+        >
+          <SunMedium size={18} />
+        </span>
+        <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+      </div>
+
+      <span
+        className={`rounded-xl px-3 py-1 text-xs font-bold tracking-[0.08em] ${
+          isDarkMode ? 'bg-cyan-500/14 text-cyan-100' : 'bg-cyan-50 text-cyan-700'
+        }`}
+      >
+        ACTIVE
+      </span>
+    </div>
+
+    <div className={`mt-8 text-sm ${theme.textMuted}`}>当前实时功率</div>
+    <div className="mt-3 flex items-end gap-2">
+      <div className={`text-[46px] font-black leading-none tracking-[-0.05em] ${theme.textPrimary}`}>1,248.5</div>
+      <div className={`pb-2 text-[20px] ${theme.textMuted}`}>kW</div>
+    </div>
+
+    <div className={`mt-auto rounded-[24px] p-5 ${theme.panelSurface}`}>
+      <div className={`text-sm ${theme.textMuted}`}>今日累计发电</div>
+      <div className="mt-3 flex items-end justify-between gap-3">
+        <div className="text-[20px] font-black text-cyan-500">8,450 kWh</div>
+        <SunMedium size={28} className="text-cyan-300" />
+      </div>
+    </div>
+  </div>
+);
+
+const SystemRankingCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col">
+    <div className="inline-flex items-center gap-3">
+      <span
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+          isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
+        }`}
+      >
+        <ListTodo size={18} />
+      </span>
+      <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+    </div>
+
+    <div className="mt-8 space-y-6">
+      {systemRankingData.map((item) => (
+        <div key={item.label}>
+          <div className="flex items-center justify-between gap-3">
+            <span className={`text-[15px] ${theme.textPrimary}`}>{item.label}</span>
+            <span className={`text-[15px] font-semibold ${theme.textSecondary}`}>{item.value}%</span>
+          </div>
+          <div className={`mt-3 h-2.5 rounded-full ${theme.trackSurface}`}>
+            <div className="h-full rounded-full bg-cyan-500" style={{ width: `${item.value}%` }} />
+          </div>
+        </div>
+      ))}
+    </div>
+  </div>
+);
+
+const MultiEnergyCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
+  const chartHeightClass =
+    widget.size === '1:1' ? 'h-36' : widget.size === '2:2' ? 'h-64' : 'h-44';
+
+  return (
+    <div className="flex h-full flex-col">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="inline-flex items-center gap-3">
+          <span
+            className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${
+              isDarkMode ? 'bg-cyan-500/12 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
+            }`}
+          >
+            <BarChart3 size={20} />
+          </span>
+          <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          {multiEnergyLegend.map((legend) => (
+            <div key={legend.key} className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-full" style={{ backgroundColor: legend.color }} />
+              <span className={`text-sm ${theme.textSecondary}`}>{legend.label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className={`mt-8 flex flex-1 items-end gap-3 border-b pb-4 ${theme.line} ${chartHeightClass}`}>
+        {multiEnergySeries.map((item) => (
+          <div key={item.time} className="flex flex-1 flex-col items-center justify-end gap-3">
+            <div className="flex h-full items-end gap-1.5">
+              {multiEnergyLegend.map((legend) => (
+                <div
+                  key={`${item.time}-${legend.key}`}
+                  className="w-4 rounded-t-[4px] sm:w-5"
+                  style={{
+                    backgroundColor: legend.color,
+                    height: `${item[legend.key]}%`,
+                  }}
+                />
+              ))}
+            </div>
+            <div className={`text-xs font-medium ${theme.textMuted}`}>{item.time}</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const CarbonMonitorCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col">
+    <div className="inline-flex items-center gap-3">
+      <span
+        className={`inline-flex h-10 w-10 items-center justify-center rounded-full ${
+          isDarkMode ? 'bg-emerald-500/12 text-emerald-200' : 'bg-emerald-50 text-emerald-700'
+        }`}
+      >
+        <Leaf size={18} />
+      </span>
+      <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+    </div>
+
+    <div className={`mt-8 text-sm ${theme.textMuted}`}>今日碳减排量</div>
+    <div className="mt-3 flex items-end gap-2">
+      <div className={`text-[54px] font-black leading-none tracking-[-0.05em] ${theme.textPrimary}`}>24.8</div>
+      <div className={`pb-2 text-[20px] ${theme.textMuted}`}>tCO2e</div>
+    </div>
+
+    <div className={`mt-auto rounded-[24px] p-5 ${theme.panelSurface}`}>
+      <div className="flex items-center justify-between gap-3">
+        <div className={`text-sm ${theme.textMuted}`}>本月目标进度</div>
+        <div className="text-sm font-bold text-cyan-600">68%</div>
+      </div>
+      <div className={`mt-4 h-2.5 rounded-full ${theme.trackSurface}`}>
+        <div className="h-full rounded-full bg-[#0f7a8d]" style={{ width: '68%' }} />
+      </div>
+      <div className={`mt-5 text-sm leading-6 ${theme.textSecondary}`}>
+        已抵消约 1,240 棵成年树木年度碳吸收量
+      </div>
+    </div>
+  </div>
+);
+
+const GenericInsightCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => {
+  const Icon = getWidgetIcon(widget);
+  const visibleItems = widget.items.slice(0, widget.size === '1:1' ? 3 : 4);
+
+  return (
+    <div className="relative flex h-full flex-col">
+      <div className={`absolute inset-x-0 top-0 h-1.5 rounded-t-[28px] bg-gradient-to-r ${widget.accent}`} />
+
+      <div className="flex items-start justify-between gap-3">
+        <div className="inline-flex items-center gap-3">
+          <span
+            className={`inline-flex h-11 w-11 items-center justify-center rounded-full ${
+              isDarkMode ? 'bg-blue-500/12 text-blue-200' : 'bg-blue-50 text-blue-700'
+            }`}
+          >
+            <Icon size={20} />
+          </span>
+          <div>
+            <div className={`text-[15px] font-semibold ${theme.textSecondary}`}>{widget.title}</div>
+            <div className={`mt-1 text-xs font-semibold uppercase tracking-[0.18em] ${theme.textMuted}`}>
+              {widget.category === 'custom' ? 'AI 定制' : '系统卡片'}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className={`mt-8 text-[44px] font-black leading-none tracking-[-0.05em] ${theme.textPrimary}`}>
+        {widget.value}
+      </div>
+
+      <p
+        className={`mt-4 text-sm leading-6 ${theme.textSecondary}`}
+        style={clampTextStyle(widget.size === '1:1' ? 2 : 3)}
+      >
+        {widget.helper}
+      </p>
+
+      <p
+        className={`mt-3 text-sm leading-6 ${theme.textMuted}`}
+        style={clampTextStyle(widget.size === '1:1' ? 3 : 4)}
+      >
+        {widget.description}
+      </p>
+
+      <div className="mt-auto space-y-3 pt-6">
+        {visibleItems.map((item) => (
+          <div key={item} className={`flex items-start gap-3 rounded-[18px] border px-4 py-3 ${theme.chipSurface}`}>
+            <span className="mt-1 h-2.5 w-2.5 rounded-full bg-cyan-500" />
+            <span className={`text-sm leading-6 ${theme.textSecondary}`}>{item}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const renderWidgetBody = (props: WidgetBodyProps) => {
+  switch (props.widget.id) {
+    case 'widget-energy':
+      return <EnergyOverviewCard {...props} />;
+    case 'widget-breakdown':
+      return <PowerCompositionCard {...props} />;
+    case 'widget-integration':
+      return <SolarPowerCard {...props} />;
+    case 'widget-actions':
+      return <SystemRankingCard {...props} />;
+    case 'widget-focus':
+      return <MultiEnergyCard {...props} />;
+    case 'widget-rhythm':
+      return <CarbonMonitorCard {...props} />;
     default:
-      return {
-        ...definition,
-        barFillClass: isDarkMode ? 'bg-slate-200/85' : 'bg-slate-500/85',
-        dotClass: 'bg-slate-400',
-        glowClass: 'bg-slate-400/14',
-        iconWrapClass: isDarkMode ? 'bg-white/10 text-slate-100' : 'bg-slate-100 text-slate-700',
-        itemIconClass: isDarkMode ? 'text-slate-100' : 'text-slate-700',
-        pillClass: isDarkMode ? 'bg-white/10 text-slate-100' : 'bg-slate-100 text-slate-700',
-      };
+      return <GenericInsightCard {...props} />;
   }
 };
 
-const getWidgetVisual = (widget: DashboardWidget): WidgetVisualDefinition =>
-  widgetVisualMap[widget.id] ?? {
-    bars: [40, 58, 72, 60, 78, 66],
-    icons: [Sparkles, BarChart3, Activity],
-  };
+type DashboardWidgetCardProps = {
+  highlight?: boolean;
+  isDarkMode: boolean;
+  mode: WidgetCardMode;
+  onRemove?: () => void;
+  widget: DashboardWidget;
+};
 
 const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
   highlight = false,
@@ -326,148 +601,17 @@ const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
   onRemove,
   widget,
 }) => {
-  const visibleItems = widget.items.slice(0, widgetItemLimitMap[widget.size]);
-  const hiddenItemsCount = Math.max(widget.items.length - visibleItems.length, 0);
-  const visual = getWidgetVisual(widget);
-  const visibleVisualIcons = visual.icons.slice(0, widgetVisualIconLimitMap[widget.size]);
-  const visibleVisualBars = visual.bars.slice(0, widgetVisualBarLimitMap[widget.size]);
-  const palette = getWidgetPalette(widget, isDarkMode);
-  const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
-  const textSecondary = isDarkMode ? 'text-slate-200/90' : 'text-slate-700';
-  const textTertiary = isDarkMode ? 'text-slate-400' : 'text-slate-500';
-  const outerSurface = isDarkMode
-    ? 'border-white/10 bg-slate-950/50 shadow-[0_26px_60px_-40px_rgba(15,23,42,0.92)]'
-    : 'border-white/95 bg-white/78 shadow-[0_24px_60px_-40px_rgba(15,23,42,0.28)]';
-  const chromeSurface = isDarkMode
-    ? 'border-white/10 bg-white/[0.08]'
-    : 'border-white/80 bg-white/58';
-  const itemSurface = isDarkMode
-    ? 'border-white/10 bg-white/[0.08] text-slate-100'
-    : 'border-white/85 bg-white/64 text-slate-700';
-  const visualPanelSurface = isDarkMode
-    ? 'border-white/10 bg-slate-950/18'
-    : 'border-white/80 bg-white/42';
-  const chartTrackSurface = isDarkMode ? 'bg-white/[0.09]' : 'bg-white/55';
-  const removeButtonSurface = isDarkMode
-    ? 'border-white/10 bg-slate-950/55 text-slate-100 hover:bg-slate-950/70'
-    : 'border-white/80 bg-white/70 text-slate-700 hover:bg-white';
-  const metricClassName = widgetMetricClassMap[widget.size];
-  const descriptionLines = widgetDescriptionLineClampMap[widget.size];
-  const showDescription = descriptionLines > 0;
+  const theme = getWidgetTheme(isDarkMode);
 
   return (
     <article
-      className={`${widgetSizeClassMap[widget.size]} ${widgetHeightClassMap[widget.size]} relative overflow-hidden rounded-[30px] border p-1 transition duration-300 ${
-        mode === 'board' ? 'hover:-translate-y-1 hover:shadow-[0_28px_70px_-42px_rgba(15,23,42,0.34)]' : ''
-      } ${highlight ? 'ring-2 ring-cyan-400/40' : ''} ${outerSurface}`}
+      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative overflow-hidden rounded-[30px] border transition duration-300 md:h-full md:min-h-0 ${
+        mode === 'board' ? 'hover:-translate-y-1 hover:shadow-[0_36px_90px_-56px_rgba(15,23,42,0.34)]' : ''
+      } ${highlight ? 'ring-2 ring-cyan-400/55' : ''} ${theme.cardSurface}`}
     >
-      <div className={`relative flex h-full flex-col overflow-hidden rounded-[26px] bg-gradient-to-br ${widget.accent} p-4`}>
-        <div className={`pointer-events-none absolute -right-8 -top-10 h-24 w-24 rounded-full blur-3xl ${palette.glowClass}`} />
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(255,255,255,0.26),transparent_42%)] opacity-80" />
-        <div className="relative flex h-full flex-col">
-          <div className="flex items-start justify-between gap-3">
-            <div className="min-w-0">
-              <h2 className={`break-words font-semibold leading-tight ${widgetTitleClassMap[widget.size]} ${textPrimary}`}>
-                {widget.title}
-              </h2>
-            </div>
-
-            <div className="flex shrink-0 items-center gap-2">
-              {mode === 'preview' && (
-                <div className={`inline-flex h-10 w-10 items-center justify-center rounded-[18px] border ${chromeSurface} ${textPrimary}`}>
-                  <GripVertical size={16} />
-                </div>
-              )}
-              <div className={`inline-flex h-10 w-10 items-center justify-center rounded-[18px] border ${chromeSurface} ${palette.itemIconClass}`}>
-                <palette.icon size={18} />
-              </div>
-            </div>
-          </div>
-
-          <div className={`mt-4 rounded-[22px] border ${visualPanelSurface} ${widgetVisualPaddingClassMap[widget.size]}`}>
-            <div className="flex items-end justify-between gap-3">
-              <div className="flex items-center gap-2">
-                {visibleVisualIcons.map((Icon, index) => (
-                  <span
-                    key={`${widget.id}-visual-icon-${index}`}
-                    className={`inline-flex items-center justify-center border ${chromeSurface} ${widgetVisualBadgeClassMap[widget.size]} ${palette.itemIconClass}`}
-                  >
-                    <Icon size={widget.size === 'large' ? 16 : 14} />
-                  </span>
-                ))}
-              </div>
-              <div className={`flex flex-1 items-end justify-end gap-1.5 ${widgetVisualHeightClassMap[widget.size]}`}>
-                {visibleVisualBars.map((height, index) => (
-                  <span
-                    key={`${widget.id}-visual-bar-${index}`}
-                    className={`relative overflow-hidden rounded-full ${widgetVisualBarWidthClassMap[widget.size]} ${chartTrackSurface}`}
-                  >
-                    <span
-                      className={`absolute inset-x-0 bottom-0 rounded-full ${palette.barFillClass}`}
-                      style={{ height: `${height}%` }}
-                    />
-                  </span>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-auto">
-            <div className="flex items-end justify-between gap-3">
-              <div className={`min-w-0 font-black leading-none tracking-tight ${metricClassName} ${textPrimary}`}>
-                {widget.value}
-              </div>
-              <div className="flex shrink-0 items-center gap-2">
-                {mode === 'preview' && onRemove && (
-                  <button
-                    type="button"
-                    onClick={onRemove}
-                    className={`rounded-full border px-3 py-1 text-[11px] font-bold transition ${removeButtonSurface}`}
-                  >
-                    移出
-                  </button>
-                )}
-              </div>
-            </div>
-
-            <p
-              className={`mt-2 text-sm font-medium leading-5 ${textSecondary}`}
-              style={clampTextStyle(widgetHelperLineClampMap[widget.size])}
-            >
-              {widget.helper}
-            </p>
-
-            {showDescription && (
-              <p
-                className={`mt-1.5 text-xs leading-5 ${textTertiary}`}
-                style={clampTextStyle(descriptionLines)}
-              >
-                {widget.description}
-              </p>
-            )}
-
-            <div className="mt-4 flex flex-wrap gap-2">
-              {visibleItems.map((item, index) => {
-                const ItemIcon = visibleVisualIcons[index % visibleVisualIcons.length] ?? palette.icon;
-
-                return (
-                  <span
-                    key={`${widget.id}-${index}`}
-                    className={`inline-flex max-w-full items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium ${itemSurface}`}
-                  >
-                    <ItemIcon size={widgetItemIconSizeMap[widget.size]} className={`shrink-0 ${palette.itemIconClass}`} />
-                    <span className="truncate">{item}</span>
-                  </span>
-                );
-              })}
-              {hiddenItemsCount > 0 && (
-                <span className={`inline-flex items-center rounded-full border px-3 py-1.5 text-xs font-semibold ${chromeSurface} ${textPrimary}`}>
-                  +{hiddenItemsCount}
-                </span>
-              )}
-            </div>
-          </div>
-        </div>
+      {mode === 'preview' && <WidgetToolbar theme={theme} onRemove={onRemove} />}
+      <div className={`relative flex h-full flex-col p-6 sm:p-7 ${mode === 'preview' ? 'pr-24' : ''}`}>
+        {renderWidgetBody({ isDarkMode, theme, widget })}
       </div>
     </article>
   );
@@ -488,7 +632,7 @@ export const DashboardHome = ({
 }) => {
   const [newTabName, setNewTabName] = useState('');
   const [dragOverWidgetId, setDragOverWidgetId] = useState<string | null>(null);
-  const [aiForm, setAiForm] = useState({ goal: '', name: '', prompt: '', size: 'medium' as WidgetSize });
+  const [aiForm, setAiForm] = useState({ goal: '', name: '', prompt: '', size: '2:1' as WidgetSize });
   const [isGeneratingWidget, setIsGeneratingWidget] = useState(false);
 
   const textPrimary = isDarkMode ? 'text-slate-100' : 'text-slate-900';
@@ -535,15 +679,18 @@ export const DashboardHome = ({
   const handleCanvasDrop = (event: React.DragEvent<HTMLDivElement>, targetWidgetId?: string) => {
     event.preventDefault();
     const payload = parseDragPayload(event.dataTransfer.getData('application/json'));
+
     if (!payload) {
       setDragOverWidgetId(null);
       return;
     }
+
     if (targetWidgetId) {
       const targetIndex = activeTab.widgetIds.indexOf(targetWidgetId);
       handleDropWidget(payload, targetIndex === -1 ? activeTab.widgetIds.length : targetIndex);
       return;
     }
+
     handleDropWidget(payload);
   };
 
@@ -552,6 +699,7 @@ export const DashboardHome = ({
       reorderWidgets(activeTab.widgetIds.filter((id) => id !== widgetId));
       return;
     }
+
     reorderWidgets([...activeTab.widgetIds, widgetId]);
   };
 
@@ -565,6 +713,7 @@ export const DashboardHome = ({
   const handleCreateTab = () => {
     const name = newTabName.trim() || `看板 ${dashboardState.tabs.length + 1}`;
     const nextTabId = createLocalId('dashboard-tab');
+
     onChange((previous) => ({
       ...previous,
       activeTabId: nextTabId,
@@ -577,6 +726,7 @@ export const DashboardHome = ({
     if (dashboardState.tabs.length <= 1) {
       return;
     }
+
     const nextTabs = dashboardState.tabs.filter((tab) => tab.id !== activeTab.id);
     onChange((previous) => ({ ...previous, activeTabId: nextTabs[0].id, tabs: nextTabs }));
   };
@@ -585,6 +735,7 @@ export const DashboardHome = ({
     if (!aiForm.name.trim() || !aiForm.prompt.trim()) {
       return;
     }
+
     setIsGeneratingWidget(true);
     try {
       const artifact = await api.generateArtifact({
@@ -594,9 +745,10 @@ export const DashboardHome = ({
         prompt: aiForm.prompt.trim(),
         size: aiForm.size,
       });
+
       const widgetId = createLocalId('widget');
       const nextWidget: DashboardWidget = {
-        accent: 'from-sky-500/28 via-indigo-400/12 to-transparent',
+        accent: 'from-sky-500 via-indigo-400 to-transparent',
         category: 'custom',
         description: artifact.description,
         helper: artifact.summary,
@@ -606,12 +758,16 @@ export const DashboardHome = ({
         title: artifact.title,
         value: artifact.badge,
       };
+
       onChange((previous) => ({
         ...previous,
-        tabs: previous.tabs.map((tab) => (tab.id === activeTab.id ? { ...tab, widgetIds: [...tab.widgetIds, widgetId] } : tab)),
+        tabs: previous.tabs.map((tab) =>
+          tab.id === activeTab.id ? { ...tab, widgetIds: [...tab.widgetIds, widgetId] } : tab,
+        ),
         widgets: [...previous.widgets, nextWidget],
       }));
-      setAiForm({ goal: '', name: '', prompt: '', size: 'medium' });
+
+      setAiForm({ goal: '', name: '', prompt: '', size: '2:1' });
     } finally {
       setIsGeneratingWidget(false);
     }
@@ -659,7 +815,9 @@ export const DashboardHome = ({
 
         <div className="relative flex flex-col">
           {activeWidgets.length === 0 ? (
-            <div className={`flex h-full min-h-[360px] items-center justify-center rounded-[28px] border border-dashed p-6 ${dashedSurface}`}>
+            <div
+              className={`flex h-full min-h-[360px] items-center justify-center rounded-[28px] border border-dashed p-6 ${dashedSurface}`}
+            >
               <div className="max-w-md text-center">
                 <div
                   className={`mx-auto flex h-16 w-16 items-center justify-center rounded-[24px] ${
@@ -675,7 +833,7 @@ export const DashboardHome = ({
               </div>
             </div>
           ) : (
-            <div className="grid content-start items-start gap-4 md:grid-cols-6 xl:grid-cols-12">
+            <div className={dashboardGridClassName}>
               {activeWidgets.map((widget) => (
                 <DashboardWidgetCard
                   key={widget.id}
@@ -709,7 +867,7 @@ export const DashboardHome = ({
                   </div>
                   <h2 className={`mt-3 text-2xl font-black ${textPrimary}`}>看板编辑器</h2>
                   <p className={`mt-2 text-sm leading-6 ${textSecondary}`}>
-                    管理看板标签、小组件尺寸与拖拽排序，右侧预览区会实时同步最终布局。
+                    管理看板标签、小组件比例与拖拽排序，右侧预览区会实时同步最终布局。
                   </p>
                 </div>
 
@@ -728,7 +886,9 @@ export const DashboardHome = ({
                 <section className={`rounded-[26px] border p-4 shadow-sm ${sectionSurface}`}>
                   <div className="flex items-center gap-2">
                     <LayoutTemplate size={16} className="text-cyan-500" />
-                    <h3 className={`text-sm font-black uppercase tracking-[0.22em] ${textSecondary}`}>看板标签</h3>
+                    <h3 className={`text-sm font-black uppercase tracking-[0.22em] ${textSecondary}`}>
+                      看板标签
+                    </h3>
                   </div>
 
                   <div className="mt-4 flex flex-wrap gap-2">
@@ -797,15 +957,18 @@ export const DashboardHome = ({
                 <section className={`mt-4 rounded-[26px] border p-4 shadow-sm ${sectionSurface}`}>
                   <div className="flex items-center gap-2">
                     <Sparkles size={16} className="text-violet-500" />
-                    <h3 className={`text-sm font-black uppercase tracking-[0.22em] ${textSecondary}`}>小组件库</h3>
+                    <h3 className={`text-sm font-black uppercase tracking-[0.22em] ${textSecondary}`}>
+                      小组件库
+                    </h3>
                   </div>
                   <p className={`mt-2 text-sm leading-6 ${textSecondary}`}>
-                    点击加入看板，或直接拖到右侧预览区进行排序。尺寸切换会实时影响布局比例。
+                    点击加入看板，或直接拖到右侧预览区进行排序。比例切换会实时影响布局。
                   </p>
 
                   <div className="mt-4 space-y-3">
                     {dashboardState.widgets.map((widget) => {
                       const selected = activeTab.widgetIds.includes(widget.id);
+                      const Icon = getWidgetIcon(widget);
 
                       return (
                         <div
@@ -828,12 +991,38 @@ export const DashboardHome = ({
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div className="min-w-0">
-                              <div className={`text-base font-black ${textPrimary}`}>{widget.title}</div>
-                              <div className={`mt-1 text-sm leading-6 ${textSecondary}`}>{widget.description}</div>
+                              <div className="flex items-center gap-3">
+                                <span
+                                  className={`inline-flex h-10 w-10 items-center justify-center rounded-2xl ${
+                                    isDarkMode ? 'bg-white/8 text-cyan-200' : 'bg-cyan-50 text-cyan-700'
+                                  }`}
+                                >
+                                  <Icon size={18} />
+                                </span>
+                                <div className={`text-base font-black ${textPrimary}`}>{widget.title}</div>
+                              </div>
+                              <div className={`mt-3 text-sm leading-6 ${textSecondary}`}>{widget.description}</div>
                             </div>
                             <div className={`rounded-2xl p-2 ${mutedSurface}`}>
                               <GripVertical size={16} className="text-slate-400" />
                             </div>
+                          </div>
+
+                          <div
+                            className={`mt-4 flex items-center justify-between gap-4 rounded-[22px] border p-3 ${inputSurface}`}
+                          >
+                            <div>
+                              <div className={`text-[11px] font-bold uppercase tracking-[0.18em] ${textSecondary}`}>
+                                布局比例
+                              </div>
+                              <div className={`mt-1 text-sm font-semibold ${textPrimary}`}>
+                                {widgetSizeLabelMap[widget.size]}
+                              </div>
+                              <div className={`mt-2 text-xs leading-5 ${textSecondary}`}>
+                                {sizeDescriptionMap[widget.size]}
+                              </div>
+                            </div>
+                            <RatioPreview isDarkMode={isDarkMode} size={widget.size} />
                           </div>
 
                           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -850,13 +1039,13 @@ export const DashboardHome = ({
                                     : `${mutedSurface} ${textPrimary}`
                                 }`}
                               >
-                                {widgetSizeLabelMap[size]}尺寸
+                                {widgetSizeLabelMap[size]}
                               </button>
                             ))}
                           </div>
 
                           <div className="mt-4 flex items-center justify-between gap-3">
-                            <div className={`text-xs leading-5 ${textSecondary}`}>{sizeDescriptionMap[widget.size]}</div>
+                            <div className={`text-xs leading-5 ${textSecondary}`}>{widget.helper}</div>
                             <button
                               type="button"
                               onClick={() => handleLibraryToggle(widget.id)}
@@ -903,7 +1092,7 @@ export const DashboardHome = ({
                         setAiForm((previous) => ({ ...previous, goal: event.target.value }))
                       }
                       className={`w-full rounded-2xl border px-4 py-3 text-sm focus:outline-none ${inputSurface} ${textPrimary}`}
-                      placeholder="业务目标，例如：跟踪办公区夜间基线负荷"
+                      placeholder="业务目标，例如：监控夜间负荷异常"
                     />
                     <textarea
                       value={aiForm.prompt}
@@ -911,7 +1100,7 @@ export const DashboardHome = ({
                         setAiForm((previous) => ({ ...previous, prompt: event.target.value }))
                       }
                       className={`min-h-[120px] w-full resize-none rounded-2xl border px-4 py-3 text-sm leading-6 focus:outline-none ${inputSurface} ${textPrimary}`}
-                      placeholder="描述你希望 AI Coding 生成什么样的小组件，例如数据结构、展示重点和摘要风格。"
+                      placeholder="描述你希望 AI Coding 生成什么样的小组件，例如展示指标、分析重点和摘要风格。"
                     />
 
                     <div className="flex flex-wrap gap-2">
@@ -928,7 +1117,7 @@ export const DashboardHome = ({
                               : `${mutedSurface} ${textPrimary}`
                           }`}
                         >
-                          {widgetSizeLabelMap[size]}尺寸
+                          {widgetSizeLabelMap[size]}
                         </button>
                       ))}
                     </div>
@@ -983,7 +1172,7 @@ export const DashboardHome = ({
                       </div>
                     </div>
                   ) : (
-                    <div className="grid content-start items-start gap-4 md:grid-cols-6 xl:grid-cols-12">
+                    <div className={dashboardGridClassName}>
                       {activeWidgets.map((widget) => (
                         <div
                           key={widget.id}
