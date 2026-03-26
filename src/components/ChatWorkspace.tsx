@@ -69,8 +69,18 @@ const quickIntents: Array<{
 ];
 
 const defaultQuickIntent: QuickIntentId = "energy-query";
+const quickTriggerPattern = /快捷(?:触发|选择|选项)?/;
+const quickTriggerOnlyPattern = /快捷(?:触发|选择|选项)?/g;
 
 const emptyProjectOptions: EnergyQuickProject[] = [];
+
+const hasQuickTrigger = (value: string) => quickTriggerPattern.test(value);
+
+const isQuickTriggerOnlyInput = (value: string) =>
+  value
+    .replace(quickTriggerOnlyPattern, "")
+    .replace(/[\s,，。.、；;:：!！?？/\\-]/g, "")
+    .length === 0;
 
 const energyTypeLabels: Record<string, string> = {
   electricity: "电",
@@ -505,6 +515,8 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     [],
   );
   const [input, setInput] = useState("");
+  const [isQuickOptionsVisible, setIsQuickOptionsVisible] = useState(false);
+  const [isQuickOptionsExpanded, setIsQuickOptionsExpanded] = useState(false);
   const [isHistoryExpanded, setIsHistoryExpanded] = useState(true);
   const [isThinking, setIsThinking] = useState(false);
   const [projectOptions, setProjectOptions] =
@@ -678,6 +690,23 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, isThinking]);
+
+  useEffect(() => {
+    if (hasQuickTrigger(input)) {
+      setIsQuickOptionsVisible(true);
+      return;
+    }
+
+    if (!input.trim()) {
+      setIsQuickOptionsVisible(false);
+    }
+  }, [input]);
+
+  useEffect(() => {
+    if (!isQuickOptionsVisible) {
+      setIsQuickOptionsExpanded(false);
+    }
+  }, [isQuickOptionsVisible]);
 
   useEffect(
     () => () => {
@@ -926,9 +955,9 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const handleQuickIntentSelect = (intentId: QuickIntentId) => {
     setSelectedIntent(intentId);
     setInput((previous) =>
-      previous.trim()
-        ? previous
-        : quickIntentDraftMap[intentId](promptProjectName),
+      !previous.trim() || isQuickTriggerOnlyInput(previous)
+        ? quickIntentDraftMap[intentId](promptProjectName)
+        : previous,
     );
     composerRef.current?.focus();
   };
@@ -1392,195 +1421,206 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           </div>
 
           <div className="mt-3 shrink-0 rounded-[24px] border p-4 shadow-sm">
-            <div className="mb-3 rounded-[20px] border border-sky-500/15 bg-sky-500/5 p-3">
-                <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+            {isQuickOptionsVisible && (
+              <div className="mb-3 rounded-[20px] border border-sky-500/15 bg-sky-500/5 p-3">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setIsQuickOptionsExpanded((previous) => !previous)
+                  }
+                  aria-expanded={isQuickOptionsExpanded}
+                  className="flex w-full items-start justify-between gap-3 text-left"
+                >
                   <div>
                     <div className="text-sm font-bold text-sky-600">
                       快捷触发
                     </div>
                     <div className={`mt-1 text-xs leading-5 ${textSecondary}`}>
-                      先选项目、能源类型和时间范围，再直接发问。
+                      命中触发词后可展开快捷选项，先选项目、能源类型和时间范围，再直接发问。
                     </div>
                   </div>
-                  {/*
-                  <div className="flex flex-wrap gap-2">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
-                  >
-                    清除
-                  </button>
-                </div>
-
-                  */}
-                  <div className="flex flex-wrap gap-2">
-                    {quickIntents.map((intent) => {
-                      const isActive = intent.id === selectedIntent;
-
-                      return (
-                        <button
-                          key={intent.id}
-                          type="button"
-                          onClick={() => handleQuickIntentSelect(intent.id)}
-                          className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
-                            isActive
-                              ? "border-sky-500/45 bg-sky-500/12 text-sky-700 dark:text-sky-300"
-                              : `${cardSurface} ${textPrimary}`
-                          }`}
-                        >
-                          {intent.label}
-                        </button>
-                      );
-                    })}
-                    <button
-                      type="button"
-                      onClick={handleQuickIntentReset}
-                      className={`rounded-full border px-3 py-1 text-xs font-semibold ${cardSurface} ${textPrimary}`}
-                    >
-                      娓呴櫎
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
-                    >
-                      {promptProjectName}
-                    </span>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
-                    >
-                      {selectedEnergyTypeLabel}
-                    </span>
-                    <span
-                      className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
-                    >
-                      {selectedTimeRangeLabel}
-                    </span>
-                  </div>
-                </div>
-
-                <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                  <select
-                    value={chatForm.projectId || chatForm.orgId}
-                    onChange={(event) =>
-                      handleProjectChange(event.target.value)
-                    }
-                    disabled={projectsLoading || projectOptions.length === 0}
-                    className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
-                  >
-                    {projectOptions.length === 0 ? (
-                      <option value="">
-                        {projectsLoading ? "项目加载中..." : "暂无可用项目"}
-                      </option>
-                    ) : (
-                      projectOptions.map((project) => (
-                        <option
-                          key={project.projectId || project.orgId}
-                          value={project.projectId || project.orgId}
-                        >
-                          {project.name}
-                        </option>
-                      ))
-                    )}
-                  </select>
-
-                  <select
-                    value={chatForm.energyType}
-                    onChange={(event) =>
-                      setChatForm((previous) => ({
-                        ...previous,
-                        energyType: event.target.value,
-                      }))
-                    }
-                    disabled={energyTypeOptions.length === 0}
-                    className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
-                  >
-                    {energyTypeOptions.length === 0 ? (
-                      <option value="">暂无能源类型</option>
-                    ) : (
-                      energyTypeOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))
-                    )}
-                  </select>
-
-                  <select
-                    value={chatForm.interval}
-                    onChange={(event) =>
-                      setChatForm((previous) => ({
-                        ...previous,
-                        interval: event.target.value,
-                      }))
-                    }
-                    disabled={intervalOptions.length === 0}
-                    className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
-                  >
-                    {intervalOptions.length === 0 ? (
-                      <option value="">暂无统计粒度</option>
-                    ) : (
-                      intervalOptions.map((option) => (
-                        <option key={option.value} value={option.value}>
-                          {option.label}
-                        </option>
-                      ))
-                    )}
-                  </select>
-
-                  <input
-                    type="date"
-                    value={chatForm.startDate}
-                    min={selectedProject?.firstSampleDate || undefined}
-                    max={selectedProject?.lastSampleDate || undefined}
-                    onChange={(event) =>
-                      handleStartDateChange(event.target.value)
-                    }
-                    className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
+                  <ChevronDown
+                    size={16}
+                    className={`mt-0.5 shrink-0 text-sky-600 transition ${
+                      isQuickOptionsExpanded ? "rotate-180" : ""
+                    }`}
                   />
+                </button>
 
-                  <input
-                    type="date"
-                    value={chatForm.endDate}
-                    min={selectedProject?.firstSampleDate || undefined}
-                    max={selectedProject?.lastSampleDate || undefined}
-                    onChange={(event) =>
-                      handleEndDateChange(event.target.value)
-                    }
-                    className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
-                  />
+                {isQuickOptionsExpanded && (
+                  <>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {quickIntents.map((intent) => {
+                        const isActive = intent.id === selectedIntent;
 
-                  <input
-                    value={chatForm.queryName}
-                    onChange={(event) =>
-                      setChatForm((previous) => ({
-                        ...previous,
-                        queryName: event.target.value,
-                      }))
-                    }
-                    placeholder="表具名称 / 分项关键词"
-                    className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
-                  />
-                </div>
+                        return (
+                          <button
+                            key={intent.id}
+                            type="button"
+                            onClick={() => handleQuickIntentSelect(intent.id)}
+                            className={`rounded-full border px-3 py-1 text-xs font-semibold transition ${
+                              isActive
+                                ? "border-sky-500/45 bg-sky-500/12 text-sky-700 dark:text-sky-300"
+                                : `${cardSurface} ${textPrimary}`
+                            }`}
+                          >
+                            {intent.label}
+                          </button>
+                        );
+                      })}
+                      <button
+                        type="button"
+                        onClick={handleQuickIntentReset}
+                        className={`rounded-full border px-3 py-1 text-xs font-semibold ${cardSurface} ${textPrimary}`}
+                      >
+                        清除
+                      </button>
+                    </div>
 
-                {selectedProject && (
-                  <div className={`mt-2 text-xs ${textSecondary}`}>
-                    数据范围：{selectedProject.firstSampleDate || "未知"} 至{" "}
-                    {selectedProject.lastSampleDate || "未知"}
-                  </div>
-                )}
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
+                      >
+                        {promptProjectName}
+                      </span>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
+                      >
+                        {selectedEnergyTypeLabel}
+                      </span>
+                      <span
+                        className={`rounded-full px-3 py-1 text-xs font-semibold ${mutedSurface} ${textPrimary}`}
+                      >
+                        {selectedTimeRangeLabel}
+                      </span>
+                    </div>
 
-                {projectsLoading && (
-                  <div className={`mt-2 text-xs ${textSecondary}`}>
-                    数据库查询配置同步中...
-                  </div>
-                )}
+                    <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      <select
+                        value={chatForm.projectId || chatForm.orgId}
+                        onChange={(event) =>
+                          handleProjectChange(event.target.value)
+                        }
+                        disabled={projectsLoading || projectOptions.length === 0}
+                        className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
+                      >
+                        {projectOptions.length === 0 ? (
+                          <option value="">
+                            {projectsLoading ? "项目加载中..." : "暂无可用项目"}
+                          </option>
+                        ) : (
+                          projectOptions.map((project) => (
+                            <option
+                              key={project.projectId || project.orgId}
+                              value={project.projectId || project.orgId}
+                            >
+                              {project.name}
+                            </option>
+                          ))
+                        )}
+                      </select>
 
-                {projectLoadError && (
-                  <div className="mt-2 text-xs text-rose-500">
-                    {projectLoadError}
-                  </div>
+                      <select
+                        value={chatForm.energyType}
+                        onChange={(event) =>
+                          setChatForm((previous) => ({
+                            ...previous,
+                            energyType: event.target.value,
+                          }))
+                        }
+                        disabled={energyTypeOptions.length === 0}
+                        className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
+                      >
+                        {energyTypeOptions.length === 0 ? (
+                          <option value="">暂无能源类型</option>
+                        ) : (
+                          energyTypeOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+
+                      <select
+                        value={chatForm.interval}
+                        onChange={(event) =>
+                          setChatForm((previous) => ({
+                            ...previous,
+                            interval: event.target.value,
+                          }))
+                        }
+                        disabled={intervalOptions.length === 0}
+                        className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
+                      >
+                        {intervalOptions.length === 0 ? (
+                          <option value="">暂无统计粒度</option>
+                        ) : (
+                          intervalOptions.map((option) => (
+                            <option key={option.value} value={option.value}>
+                              {option.label}
+                            </option>
+                          ))
+                        )}
+                      </select>
+
+                      <input
+                        type="date"
+                        value={chatForm.startDate}
+                        min={selectedProject?.firstSampleDate || undefined}
+                        max={selectedProject?.lastSampleDate || undefined}
+                        onChange={(event) =>
+                          handleStartDateChange(event.target.value)
+                        }
+                        className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
+                      />
+
+                      <input
+                        type="date"
+                        value={chatForm.endDate}
+                        min={selectedProject?.firstSampleDate || undefined}
+                        max={selectedProject?.lastSampleDate || undefined}
+                        onChange={(event) =>
+                          handleEndDateChange(event.target.value)
+                        }
+                        className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
+                      />
+
+                      <input
+                        value={chatForm.queryName}
+                        onChange={(event) =>
+                          setChatForm((previous) => ({
+                            ...previous,
+                            queryName: event.target.value,
+                          }))
+                        }
+                        placeholder="表具名称 / 分项关键词"
+                        className={`rounded-2xl border px-4 py-3 text-sm focus:outline-none ${cardSurface} ${textPrimary}`}
+                      />
+                    </div>
+
+                    {selectedProject && (
+                      <div className={`mt-2 text-xs ${textSecondary}`}>
+                        数据范围：{selectedProject.firstSampleDate || "未知"} 至{" "}
+                        {selectedProject.lastSampleDate || "未知"}
+                      </div>
+                    )}
+
+                    {projectsLoading && (
+                      <div className={`mt-2 text-xs ${textSecondary}`}>
+                        数据库查询配置同步中...
+                      </div>
+                    )}
+
+                    {projectLoadError && (
+                      <div className="mt-2 text-xs text-rose-500">
+                        {projectLoadError}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
+            )}
 
             <textarea
               ref={composerRef}
