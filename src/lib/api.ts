@@ -5,42 +5,22 @@ const resolveApiBaseUrl = () => {
     String(import.meta.env.VITE_API_BASE_URL ?? "").trim(),
   );
 
+  if (configuredBaseUrl) {
+    return configuredBaseUrl;
+  }
+
   if (typeof window !== "undefined") {
     const currentHost = window.location.hostname;
     const isFileProtocol = window.location.protocol === "file:";
     const isLocalPage =
       currentHost === "localhost" || currentHost === "127.0.0.1";
 
-    if (!configuredBaseUrl && (isLocalPage || isFileProtocol)) {
+    if (isLocalPage || isFileProtocol) {
       return "http://127.0.0.1:8787";
     }
   }
 
-  if (!configuredBaseUrl) {
-    return "";
-  }
-
-  if (typeof window === "undefined") {
-    return configuredBaseUrl;
-  }
-
-  const currentHost = window.location.hostname;
-  const isLocalPage =
-    currentHost === "localhost" || currentHost === "127.0.0.1";
-  const isLoopbackApi =
-    configuredBaseUrl === "http://localhost:8787" ||
-    configuredBaseUrl === "http://127.0.0.1:8787";
-
-  // Avoid baking localhost API into production bundles or file:// previews.
-  if (isLoopbackApi && !import.meta.env.DEV) {
-    return "";
-  }
-
-  if (isLoopbackApi && !isLocalPage) {
-    return "";
-  }
-
-  return configuredBaseUrl;
+  return "";
 };
 
 const API_BASE_URL = resolveApiBaseUrl();
@@ -290,6 +270,7 @@ export type EnergyQuickProject = {
   orgId: string;
   organizationPath?: string;
   projectCode?: string;
+  projectId?: string;
   projectName?: string;
   recordCount?: number;
 };
@@ -308,6 +289,7 @@ export type EnergyQueryConfig = {
     pageNum: number;
     pageSize: number;
     project: string;
+    projectId: string;
     startDate: string;
   };
   energyTypes: EnergyQueryOption[];

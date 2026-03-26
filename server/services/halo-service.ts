@@ -28,6 +28,17 @@ type ImportedEnergyProjectRow = {
   name: string;
 };
 
+type EnergyQueryProjectViewRow = {
+  first_sample_date: string | null;
+  last_sample_date: string | null;
+  org_id: string;
+  organization_path: string | null;
+  project_code: string;
+  project_id: string;
+  project_name: string;
+  record_count: number | string | null;
+};
+
 type ImportedEnergyMetricRow = {
   energy_type: string;
   metadata: Record<string, unknown> | null;
@@ -92,6 +103,7 @@ export type ImportedEnergyProject = {
   orgId: string;
   organizationPath: string;
   projectCode: string;
+  projectId: string;
   projectName: string;
   recordCount: number;
 };
@@ -110,6 +122,7 @@ export type EnergyQueryConfig = {
     pageNum: number;
     pageSize: number;
     project: string;
+    projectId: string;
     startDate: string;
   };
   energyTypes: EnergyQueryOption[];
@@ -128,6 +141,7 @@ export type ImportedEnergyReport = {
     meterType: string;
     orgId: string;
     projectName: string;
+    projectId: string;
     requestedGranularity: "day" | "hour";
     returnedGranularity: string;
     startDate: string;
@@ -395,9 +409,6 @@ const matchesImportedEnergyQuery = (
   return terms.every((term) => haystack.includes(term));
 };
 
-const isImportedEnergyProject = (row: ImportedEnergyProjectRow) =>
-  normalizeStringValue(row.metadata?.source) === "energy-report-import";
-
 const toImportedEnergyQueryRow = (
   row: ImportedEnergyMetricRow,
   project: ImportedEnergyProjectRow,
@@ -464,6 +475,7 @@ const buildImportedEnergyReportResponse = (
     pageNum: number;
     pageSize: number;
     projectName: string;
+    projectId: string;
     requestedGranularity: "day" | "hour";
     startDate: string;
   },
@@ -492,6 +504,7 @@ const buildImportedEnergyReportResponse = (
       orgName: row.project_name,
       orgPath: row.organization_path,
       projectCode: row.project_code,
+      projectId: options.projectId,
       projectName: row.project_name,
       sampleDate: row.sample_date,
       sampleTime: row.sample_date,
@@ -509,6 +522,7 @@ const buildImportedEnergyReportResponse = (
       meterType: options.meterType,
       orgId: options.orgId,
       projectName: options.projectName,
+      projectId: options.projectId,
       requestedGranularity: options.requestedGranularity,
       returnedGranularity: rows[0]?.granularity ?? "day",
       startDate: sampleDates[0] ?? options.startDate,
@@ -861,41 +875,76 @@ export const createEnergyMetric = async (input: MetricInput) => {
   return data;
 };
 
-const loadImportedProjectRows = async () => {
+const loadImportedProjectRows = async (projectIds?: string[]) => {
   const supabase = getSupabase();
-  const { data, error } = await supabase
+  let query = supabase
     .from("projects")
     .select("id, code, name, metadata")
     .order("name", { ascending: true });
+
+  if (projectIds && projectIds.length > 0) {
+    query = query.in("id", projectIds);
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     throw error;
   }
 
-  return ((data ?? []) as ImportedEnergyProjectRow[]).filter((row) =>
-    isImportedEnergyProject(row),
-  );
+  return (data ?? []) as ImportedEnergyProjectRow[];
 };
 
 const toImportedEnergyProject = (
-  row: ImportedEnergyProjectRow,
+  row: EnergyQueryProjectViewRow,
+  projectRow?: ImportedEnergyProjectRow,
 ): ImportedEnergyProject => ({
   availableGranularities:
-    normalizeStringList(row.metadata?.availableGranularities).length > 0
-      ? normalizeStringList(row.metadata?.availableGranularities)
+    normalizeStringList(projectRow?.metadata?.availableGranularities).length > 0
+      ? normalizeStringList(projectRow?.metadata?.availableGranularities)
       : ["day"],
   availableMeterTypes:
-    normalizeStringList(row.metadata?.availableMeterTypes).length > 0
-      ? normalizeStringList(row.metadata?.availableMeterTypes)
+    normalizeStringList(projectRow?.metadata?.availableMeterTypes).length > 0
+      ? normalizeStringList(projectRow?.metadata?.availableMeterTypes)
       : ["electricity"],
-  firstSampleDate: normalizeStringValue(row.metadata?.firstSampleDate),
-  lastSampleDate: normalizeStringValue(row.metadata?.lastSampleDate),
-  orgId: row.code,
-  organizationPath: normalizeStringValue(row.metadata?.organizationPath),
-  projectCode: row.code,
-  projectName: row.name,
-  recordCount: parsePositiveInteger(row.metadata?.recordCount, 0),
+  firstSampleDate:
+    normalizeStringValue(row.first_sample_date) ||
+    normalizeStringValue(projectRow?.metadata?.firstSampleDate),
+  lastSampleDate:
+    normalizeStringValue(row.last_sample_date) ||
+    normalizeStringValue(projectRow?.metadata?.lastSampleDate),
+  orgId:
+    normalizeStringValue(row.org_id) || normalizeStringValue(row.project_code),
+  organizationPath:
+    normalizeStringValue(row.organization_path) ||
+    normalizeStringValue(projectRow?.metadata?.organizationPath),
+  projectCode:
+    normalizeStringValue(row.project_code) || normalizeStringValue(projectRow?.code),
+  projectId:
+    normalizeStringValue(row.project_id) || normalizeStringValue(projectRow?.id),
+  projectName:
+    normalizeStringValue(projectRow?.name) || normalizeStringValue(row.project_name),
+  recordCount: parsePositiveInteger(
+    row.record_count,
+    parsePositiveInteger(projectRow?.metadata?.recordCount, 0),
+  ),
 });
+
+const loadEnergyQueryProjectRows = async () => {
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from("energy_query_projects")
+    .select(
+      "project_id, project_code, project_name, org_id, organization_path, record_count, first_sample_date, last_sample_date",
+    )
+    .order("project_name", { ascending: true });
+
+  if (error) {
+    throw error;
+  }
+
+  return (data ?? []) as EnergyQueryProjectViewRow[];
+};
 
 const toEnergyQueryOption = (
   value: string,
@@ -911,10 +960,19 @@ export const listImportedEnergyProjects = async (
   const allowLocalFallback = options.allowLocalFallback ?? true;
 
   try {
-    const rows = await loadImportedProjectRows();
+    const rows = await loadEnergyQueryProjectRows();
 
     if (rows.length > 0) {
-      return rows.map(toImportedEnergyProject);
+      const projectRows = await loadImportedProjectRows(
+        rows.map((row) => row.project_id),
+      );
+      const projectRowById = new Map(
+        projectRows.map((row) => [row.id, row] as const),
+      );
+
+      return rows.map((row) =>
+        toImportedEnergyProject(row, projectRowById.get(row.project_id)),
+      );
     }
 
     if (!allowLocalFallback) {
@@ -946,6 +1004,8 @@ export const listImportedEnergyProjects = async (
     orgId: project.orgId,
     organizationPath: project.organizationPath,
     projectCode: project.projectCode,
+    projectId:
+      "projectId" in project ? normalizeStringValue(project.projectId) : "",
     projectName: project.projectName,
     recordCount: project.recordCount,
   }));
@@ -989,6 +1049,7 @@ export const getEnergyQueryConfig = async (
       pageNum: 1,
       pageSize: 20,
       project: defaultProject.projectName,
+      projectId: defaultProject.projectId,
       startDate: defaultStartDate,
     },
     energyTypes: energyTypeValues.map((value) =>
@@ -1006,7 +1067,10 @@ export const queryImportedEnergyReport = async (
   options: ImportedEnergyLoadOptions = {},
 ): Promise<ImportedEnergyReport> => {
   const allowLocalFallback = options.allowLocalFallback ?? true;
-  const orgId = normalizeStringValue(payload.orgId);
+  const projectId = normalizeStringValue(payload.projectId ?? payload.project_id);
+  const orgId = normalizeStringValue(
+    payload.orgId ?? payload.projectCode ?? payload.project_code,
+  );
   const meterType = normalizeSearchText(payload.meterType) || "electricity";
   const startDate = resolveDateFromTimestamp(payload.startTime);
   const endDate = resolveDateFromTimestamp(payload.endTime);
@@ -1017,10 +1081,15 @@ export const queryImportedEnergyReport = async (
 
   try {
     const supabase = getSupabase();
-    const importedProjects = await loadImportedProjectRows();
-    const project = orgId
-      ? importedProjects.find((item) => item.code === orgId)
-      : importedProjects[0];
+    const importedProjects = await loadEnergyQueryProjectRows();
+    const project = projectId
+      ? importedProjects.find((item) => item.project_id === projectId)
+      : orgId
+        ? importedProjects.find(
+            (item) =>
+              item.org_id === orgId || item.project_code === orgId,
+          )
+        : importedProjects[0];
 
     if (project) {
       const remoteRows: ImportedEnergyQueryRow[] = [];
@@ -1032,7 +1101,7 @@ export const queryImportedEnergyReport = async (
           .select(
             "project_code, project_name, org_id, organization_path, energy_path, meter_name, meter_number, sample_date, granularity, meter_type, usage_kwh, source_file, metadata",
           )
-          .eq("project_id", project.id)
+          .eq("project_id", project.project_id)
           .eq("meter_type", meterType)
           .order("sample_date", { ascending: false })
           .order("usage_kwh", { ascending: false })
@@ -1067,10 +1136,11 @@ export const queryImportedEnergyReport = async (
       return buildImportedEnergyReportResponse(filteredRows, {
         endDate,
         meterType,
-        orgId: project.code,
+        orgId: project.org_id,
         pageNum,
         pageSize,
-        projectName: project.name,
+        projectId: project.project_id,
+        projectName: project.project_name,
         requestedGranularity,
         startDate,
       });
@@ -1078,8 +1148,10 @@ export const queryImportedEnergyReport = async (
 
     if (!allowLocalFallback) {
       throw new Error(
-        orgId
-          ? `No Supabase energy records found for orgId "${orgId}".`
+        projectId
+          ? `No Supabase energy records found for projectId "${projectId}".`
+          : orgId
+            ? `No Supabase energy records found for orgId "${orgId}".`
           : "No Supabase energy records are available.",
       );
     }
@@ -1094,11 +1166,17 @@ export const queryImportedEnergyReport = async (
   }
 
   const localData = readLocalImportedEnergyData();
-  const localProject = orgId
-    ? localData?.projects.find((project) => project.orgId === orgId)
+  const localProject = projectId
+    ? localData?.projects.find(
+        (project) =>
+          "projectId" in project &&
+          normalizeStringValue(project.projectId) === projectId,
+      )
+    : orgId
+      ? localData?.projects.find((project) => project.orgId === orgId)
     : localData?.projects[0];
   const scopedLocalRows =
-    orgId && !localProject
+    (projectId || orgId) && !localProject
       ? []
       : (localData?.records ?? []).filter(
           (row) => !localProject || row.org_id === localProject.orgId,
@@ -1118,6 +1196,10 @@ export const queryImportedEnergyReport = async (
     orgId: localProject?.orgId ?? orgId,
     pageNum,
     pageSize,
+    projectId:
+      ("projectId" in (localProject ?? {}) &&
+        normalizeStringValue(localProject?.projectId)) ||
+      projectId,
     projectName: localProject?.projectName ?? "",
     requestedGranularity,
     startDate,

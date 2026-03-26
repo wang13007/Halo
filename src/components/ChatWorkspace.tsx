@@ -106,15 +106,16 @@ const normalizeQuickProjects = (
 
   projects.forEach((project) => {
     const name = resolveQuickProjectName(project);
+    const projectId = normalizeString(project.projectId);
     const orgId =
       normalizeString(project.orgId) || normalizeString(project.projectCode);
     const projectCode = normalizeString(project.projectCode) || orgId;
 
-    if (!name || !orgId) {
+    if (!name || (!projectId && !orgId)) {
       return;
     }
 
-    dedupedProjects.set(projectCode || orgId, {
+    dedupedProjects.set(projectId || projectCode || orgId, {
       availableGranularities: normalizeStringList(
         project.availableGranularities,
       ),
@@ -126,6 +127,7 @@ const normalizeQuickProjects = (
       orgId,
       organizationPath: normalizeString(project.organizationPath),
       projectCode,
+      projectId,
       recordCount:
         typeof project.recordCount === "number" &&
         Number.isFinite(project.recordCount)
@@ -341,6 +343,15 @@ const readContextFromSession = (session: ChatSession) => {
   return rawContext;
 };
 
+const findProjectOption = (
+  projects: EnergyQuickProject[],
+  selectionValue: string,
+) =>
+  projects.find(
+    (project) =>
+      project.projectId === selectionValue || project.orgId === selectionValue,
+  ) ?? null;
+
 export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const [chatForm, setChatForm] = useState<ChatQueryForm>({
     endDate: "",
@@ -350,6 +361,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     pageNum: 1,
     pageSize: 20,
     project: "",
+    projectId: "",
     queryName: "",
     startDate: "",
   });
@@ -391,10 +403,13 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
   const selectedProject = useMemo(
     () =>
-      projectOptions.find((project) => project.orgId === chatForm.orgId) ??
+      findProjectOption(
+        projectOptions,
+        chatForm.projectId || chatForm.orgId,
+      ) ??
       projectOptions[0] ??
       null,
-    [chatForm.orgId, projectOptions],
+    [chatForm.orgId, chatForm.projectId, projectOptions],
   );
 
   const energyTypeOptions = useMemo(() => {
@@ -453,6 +468,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           interval: "",
           orgId: "",
           project: "",
+          projectId: "",
           startDate: "",
         };
       }
@@ -499,6 +515,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
         interval: nextInterval,
         orgId: project.orgId,
         project: project.name,
+        projectId: project.projectId || "",
         queryName: options?.preferredText ?? previous.queryName,
         startDate: startDate || defaultDate,
       };
@@ -557,8 +574,9 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           projects: normalizedProjects,
         };
         const matchedProject =
-          normalizedProjects.find(
-            (project) => project.orgId === response.defaults.orgId,
+          findProjectOption(
+            normalizedProjects,
+            response.defaults.projectId || response.defaults.orgId,
           ) ??
           normalizedProjects[0] ??
           null;
@@ -691,9 +709,8 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     );
   };
 
-  const handleProjectChange = (orgId: string) => {
-    const matchedProject =
-      projectOptions.find((project) => project.orgId === orgId) ?? null;
+  const handleProjectChange = (selectionValue: string) => {
+    const matchedProject = findProjectOption(projectOptions, selectionValue);
     applyProjectSelection(matchedProject, queryConfig, { resetDates: true });
   };
 
@@ -752,6 +769,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
             intervalValue: chatForm.interval,
             orgId: chatForm.orgId,
             project: chatForm.project,
+            projectId: chatForm.projectId,
             queryName: chatForm.queryName,
             startDate: chatForm.startDate,
             timeRange: selectedTimeRangeLabel,
@@ -847,7 +865,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       let upstreamStatus: number | null = null;
 
       if (activeIntent) {
-        if (!chatForm.orgId.trim()) {
+        if (!chatForm.projectId.trim() && !chatForm.orgId.trim()) {
           throw new Error("数据库查询配置尚未准备好，请先检查项目接口。");
         }
 
@@ -876,7 +894,9 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
             endDate: chatForm.endDate,
             energyType: selectedEnergyTypeLabel,
             interval: selectedIntervalLabel,
+            orgId: chatForm.orgId,
             project: chatForm.project,
+            projectId: chatForm.projectId,
             queryName: chatForm.queryName,
             startDate: chatForm.startDate,
             timeRange: selectedTimeRangeLabel,
@@ -960,6 +980,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
     try {
       const session = await sessionStoreRef.current.get(sessionId);
       const context = readContextFromSession(session);
+      const preferredProjectId = normalizeString(context?.projectId);
       const preferredOrgId = normalizeString(context?.orgId);
 
       setChatMessages(mapSessionMessagesToView(session.messages));
@@ -969,10 +990,11 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
       setLastSavedAt(session.updated_at);
       upsertHistorySession(session);
 
-      if (preferredOrgId) {
-        const matchedProject =
-          projectOptions.find((project) => project.orgId === preferredOrgId) ??
-          null;
+      if (preferredProjectId || preferredOrgId) {
+        const matchedProject = findProjectOption(
+          projectOptions,
+          preferredProjectId || preferredOrgId,
+        );
 
         applyProjectSelection(matchedProject, queryConfig, {
           preferredEnergyType:
@@ -1168,7 +1190,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
                 <div className="mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
                   <select
-                    value={chatForm.orgId}
+                    value={chatForm.projectId || chatForm.orgId}
                     onChange={(event) =>
                       handleProjectChange(event.target.value)
                     }
@@ -1181,7 +1203,10 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
                       </option>
                     ) : (
                       projectOptions.map((project) => (
-                        <option key={project.orgId} value={project.orgId}>
+                        <option
+                          key={project.projectId || project.orgId}
+                          value={project.projectId || project.orgId}
+                        >
                           {project.name}
                         </option>
                       ))

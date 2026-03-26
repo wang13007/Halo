@@ -9,6 +9,7 @@ export type ChatQueryForm = {
   pageNum: number;
   pageSize: number;
   project: string;
+  projectId: string;
   queryName: string;
   startDate: string;
 };
@@ -47,6 +48,7 @@ export function buildEnergyQueryPayload(form: ChatQueryForm) {
     orgId: form.orgId,
     pageNum: form.pageNum,
     pageSize: form.pageSize,
+    projectId: form.projectId,
     queryName: form.queryName.trim(),
     queryType,
     startTime: startAt,
