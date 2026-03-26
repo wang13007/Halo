@@ -904,20 +904,6 @@ export const DashboardHome = ({
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-3">
-            <div className={`rounded-[var(--dashboard-radius-panel)] border px-4 py-3 ${theme.canvasSurface}`}>
-              <div className={`dashboard-meta ${theme.textMuted}`}>当前组件数</div>
-              <div className={`mt-1 text-lg font-semibold ${theme.textPrimary}`}>{activeWidgets.length}</div>
-            </div>
-            <div className={`rounded-[var(--dashboard-radius-panel)] border px-4 py-3 ${theme.canvasSurface}`}>
-              <div className={`dashboard-meta ${theme.textMuted}`}>布局密度</div>
-              <div className={`mt-1 text-lg font-semibold ${theme.textPrimary}`}>均衡</div>
-            </div>
-            <div className={`rounded-[var(--dashboard-radius-panel)] border px-4 py-3 ${theme.canvasSurface}`}>
-              <div className={`dashboard-meta ${theme.textMuted}`}>文本语境</div>
-              <div className={`mt-1 text-lg font-semibold ${theme.textPrimary}`}>统一中文</div>
-            </div>
-          </div>
         </div>
       </section>
 
