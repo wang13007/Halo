@@ -39,14 +39,6 @@ type EnergyQueryProjectViewRow = {
   record_count: number | string | null;
 };
 
-type ImportedEnergyMetricRow = {
-  energy_type: string;
-  metadata: Record<string, unknown> | null;
-  metric_at: string;
-  source: string;
-  usage_kwh: number | string | null;
-};
-
 type ImportedEnergyQueryRow = {
   energy_path: string;
   granularity: string;
@@ -407,32 +399,6 @@ const matchesImportedEnergyQuery = (
     .join(" ");
 
   return terms.every((term) => haystack.includes(term));
-};
-
-const toImportedEnergyQueryRow = (
-  row: ImportedEnergyMetricRow,
-  project: ImportedEnergyProjectRow,
-): ImportedEnergyQueryRow => {
-  const metadata = normalizeMetadata(row.metadata);
-  const sampleDate =
-    normalizeStringValue(metadata.sampleDate) ||
-    formatDateInTimeZone(Date.parse(row.metric_at), "Asia/Shanghai");
-
-  return {
-    energy_path: normalizeStringValue(metadata.energyPath) || "Uncategorized",
-    granularity: normalizeStringValue(metadata.granularity) || "day",
-    meter_name: normalizeStringValue(metadata.meterName) || row.source,
-    meter_number: normalizeStringValue(metadata.meterNumber) || row.source,
-    meter_type: normalizeStringValue(row.energy_type) || "electricity",
-    metadata,
-    org_id: project.code,
-    organization_path: normalizeStringValue(metadata.organizationPath),
-    project_code: project.code,
-    project_name: project.name,
-    sample_date: sampleDate,
-    source_file: normalizeStringValue(metadata.sourceFile),
-    usage_kwh: row.usage_kwh,
-  };
 };
 
 let cachedImportedEnergyData: ImportedEnergyDataset | null | undefined;

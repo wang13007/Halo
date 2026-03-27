@@ -140,8 +140,12 @@ function truncateUnknown(value: unknown, depth = 0): unknown {
   return value;
 }
 
+export function buildEnergyQueryPreview(value: unknown) {
+  return truncateUnknown(value);
+}
+
 function toPreviewText(value: unknown) {
-  return JSON.stringify(truncateUnknown(value), null, 2);
+  return JSON.stringify(buildEnergyQueryPreview(value), null, 2);
 }
 
 export function formatEnergyQueryMessage(

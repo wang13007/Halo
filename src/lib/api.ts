@@ -157,29 +157,6 @@ export type Integration = {
   username: string | null;
 };
 
-export type EnergyAnalysisResponse = {
-  breakdown: Array<{ name: string; value: number }>;
-  chart: Array<{
-    hvac: number;
-    lighting: number;
-    other: number;
-    plugs: number;
-    time: string;
-  }>;
-  lastUpdatedAt: string | null;
-  project: Project;
-  stats: {
-    carbonKg: number;
-    carbonTrendPercent: number;
-    costTrendPercent: number;
-    estimatedCostAmount: number;
-    monthTrendPercent: number;
-    monthUsageKwh: number;
-    todayTrendPercent: number;
-    todayUsageKwh: number;
-  };
-};
-
 export type Report = {
   created_at: string;
   file_url: string | null;
@@ -329,12 +306,6 @@ export const api = {
       method: "POST",
       signal,
     }),
-  getEnergyAnalysis: (projectCode?: string) =>
-    request<EnergyAnalysisResponse>(
-      `/api/energy/analysis${
-        projectCode ? `?projectCode=${encodeURIComponent(projectCode)}` : ""
-      }`,
-    ),
   getEnergyQueryConfig: (signal?: AbortSignal) =>
     request<EnergyQueryConfig>("/api/energy/query-config", { signal }),
   getEnergyQuickProjects: (signal?: AbortSignal) =>

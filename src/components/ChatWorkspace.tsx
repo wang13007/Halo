@@ -26,6 +26,7 @@ import {
   toChatSessionSummary,
 } from "../lib/chatSessions";
 import {
+  buildEnergyQueryPreview,
   buildEnergyQueryPayload,
   queryEnergyReport,
   type ChatQueryForm,
@@ -1123,10 +1124,12 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
 
     try {
       let dataPreview: unknown = null;
+      let queryError = "";
       let requestPayload: Record<string, unknown> | null = null;
       let upstreamStatus: number | null = null;
 
       if (activeIntent) {
+        try {
         if (!chatForm.projectId.trim() && !chatForm.orgId.trim()) {
           throw new Error("数据库查询配置尚未准备好，请先检查项目接口。");
         }
@@ -1141,8 +1144,18 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           throw new Error(reportResponse.message || "能耗查询失败。");
         }
 
-        dataPreview = reportResponse.data ?? null;
+        dataPreview = buildEnergyQueryPreview(reportResponse.data ?? null);
         upstreamStatus = reportResponse.upstreamStatus;
+        } catch (error) {
+          queryError =
+            error instanceof Error
+              ? error.message
+              : "鑳借€楁煡璇㈡殏鏃朵笉鍙敤銆?";
+          dataPreview = buildEnergyQueryPreview({
+            queryError,
+            requestPayload,
+          });
+        }
       }
 
       if (requestRunId !== requestRunIdRef.current) {
@@ -1162,6 +1175,7 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
             queryName: chatForm.queryName,
             startDate: chatForm.startDate,
             timeRange: selectedTimeRangeLabel,
+            ...(queryError ? { queryError } : {}),
           },
           dataPreview,
           message,
@@ -1180,6 +1194,35 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
           ? "当前未调用真实 AI 模型，后端缺少 GEMINI_API_KEY，现已回退为本地占位回复。"
           : "",
       );
+
+      /*
+      const statusMessages = [
+        ...(queryError
+          ? ["鑳借€楁煡璇㈡湭瀹屽叏鎴愬姛锛孉I 宸插熀浜庡綋鍓嶄笂涓嬫枃缁х画鍥炲銆?]
+          : []),
+        ...(response.usedFallback
+          ? [
+              "褰撳墠鏈皟鐢ㄧ湡瀹?AI 妯″瀷锛屽悗绔己灏?GEMINI_API_KEY锛岀幇宸插洖閫€涓烘湰鍦板垎鏋愬洖澶嶃€?",
+            ]
+          : []),
+      ];
+
+      setAiStatusMessage(statusMessages.join(" "));
+
+      */
+
+      const statusMessages = [
+        ...(queryError
+          ? ["Energy query did not fully succeed, so the reply continued with the available context."]
+          : []),
+        ...(response.usedFallback
+          ? [
+              "The server is using local fallback analysis because GEMINI_API_KEY is not configured.",
+            ]
+          : []),
+      ];
+
+      setAiStatusMessage(statusMessages.join(" "));
 
       const assistantMessage = createChatMessage({
         content: response.reply,

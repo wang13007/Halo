@@ -137,12 +137,176 @@ const buildFallbackReport = (input, selection, availability) => {
         usedFallback: true,
     };
 };
+const toFiniteNumber = (value) => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : 0;
+};
+const formatEnergyNumber = (value) => value.toLocaleString('zh-CN', { maximumFractionDigits: 2 });
+const readEnergySummary = (value) => {
+    if (!isPlainObject(value)) {
+        return null;
+    }
+    const summary = isPlainObject(value.summary)
+        ? value.summary
+        : isPlainObject(value.data) && isPlainObject(value.data.summary)
+            ? value.data.summary
+            : null;
+    if (!summary) {
+        return null;
+    }
+    return {
+        endDate: sanitizeString(summary.endDate, ''),
+        matchedRecordCount: toFiniteNumber(summary.matchedRecordCount),
+        meterCount: toFiniteNumber(summary.meterCount),
+        projectName: sanitizeString(summary.projectName, ''),
+        returnedGranularity: sanitizeString(summary.returnedGranularity, ''),
+        startDate: sanitizeString(summary.startDate, ''),
+        totalUsageKwh: toFiniteNumber(summary.totalUsageKwh),
+    };
+};
+const normalizeEnergyRecord = (record) => ({
+    deviceName: sanitizeString(record.deviceName ?? record.meterName, ''),
+    energyItemPath: sanitizeString(record.energyItemPath, ''),
+    meterType: sanitizeString(record.meterType, ''),
+    projectName: sanitizeString(record.projectName ?? record.orgName, ''),
+    sampleDate: sanitizeString(record.sampleDate ?? record.sampleTime, ''),
+    usageKwh: toFiniteNumber(record.usageKwh ?? record.totalOne ?? record.value),
+});
+const readQueryIssue = (input) => {
+    if (isPlainObject(input.context)) {
+        const contextIssue = sanitizeString(input.context.queryError, '');
+        if (contextIssue) {
+            return contextIssue;
+        }
+    }
+    if (isPlainObject(input.dataPreview)) {
+        return sanitizeString(input.dataPreview.queryError, '');
+    }
+    return '';
+};
+const sumEnergyUsage = (records) => records.reduce((sum, record) => sum + record.usageKwh, 0);
+const groupUsageByDate = (records) => {
+    const grouped = new Map();
+    records.forEach((record) => {
+        const key = record.sampleDate || 'unknown';
+        grouped.set(key, (grouped.get(key) ?? 0) + record.usageKwh);
+    });
+    return [...grouped.entries()]
+        .map(([date, usageKwh]) => ({ date, usageKwh }))
+        .sort((left, right) => left.date.localeCompare(right.date));
+};
+const buildFallbackEnergyAnalysis = (input) => {
+    const context = isPlainObject(input.context) ? input.context : {};
+    const summary = readEnergySummary(input.dataPreview);
+    const queryIssue = readQueryIssue(input);
+    const records = collectPrimaryRecords(input.dataPreview)
+        .map(normalizeEnergyRecord)
+        .filter((record) => record.usageKwh > 0);
+    const totalUsageKwh = summary?.totalUsageKwh || sumEnergyUsage(records);
+    const matchedRecordCount = summary?.matchedRecordCount || records.length;
+    const meterCount = summary?.meterCount ||
+        new Set(records.map((record) => record.deviceName || record.energyItemPath)).size;
+    const projectName = summary?.projectName || sanitizeString(context.project, '未指定项目');
+    const fallbackRange = [summary?.startDate, summary?.endDate]
+        .filter(Boolean)
+        .join(' 至 ');
+    const timeRange = sanitizeString(context.timeRange, fallbackRange || '未指定');
+    const topRecords = [...records]
+        .sort((left, right) => right.usageKwh - left.usageKwh)
+        .slice(0, 3);
+    const groupedDates = groupUsageByDate(records);
+    const highestDate = groupedDates.length > 0
+        ? [...groupedDates].sort((left, right) => right.usageKwh - left.usageKwh)[0]
+        : null;
+    const lowestDate = groupedDates.length > 0
+        ? [...groupedDates].sort((left, right) => left.usageKwh - right.usageKwh)[0]
+        : null;
+    const topUsage = sumEnergyUsage(topRecords);
+    const topShare = totalUsageKwh > 0 ? topUsage / totalUsageKwh : 0;
+    const title = `${resolveActionLabel(input.action)}分析`;
+    const lines = [
+        `## ${title}`,
+        '',
+        `- 项目：${projectName}`,
+        `- 时间范围：${timeRange}`,
+        `- 能源类型：${sanitizeString(context.energyType, '未指定')}`,
+        `- 时间粒度：${sanitizeString(context.interval, summary?.returnedGranularity || '未指定')}`,
+    ];
+    if (queryIssue) {
+        lines.push(`- 查询状态：${queryIssue}`);
+    }
+    if (records.length === 0) {
+        lines.push('');
+        lines.push('当前没有可用于分析的有效明细数据。');
+        lines.push('建议先检查项目、日期范围和能耗类型，确认查询结果里已经返回 list/summary 后再继续追问。');
+        return {
+            model: defaultModel,
+            reply: lines.join('\n'),
+            thinking: [
+                `已识别为 ${resolveActionLabel(input.action)} 场景`,
+                queryIssue || '本次没有拿到可用的明细数据',
+                '当前使用本地 fallback 生成结果',
+            ].join('\n'),
+            usedFallback: true,
+        };
+    }
+    lines.push('');
+    lines.push('## 关键结论');
+    lines.push(`- 本次返回 ${matchedRecordCount} 条记录，覆盖 ${meterCount || records.length} 个表计，总用能 ${formatEnergyNumber(totalUsageKwh)} kWh。`);
+    if (topRecords[0]) {
+        const topRecordName = topRecords[0].deviceName || topRecords[0].energyItemPath || '未命名表计';
+        lines.push(`- 最高单条记录为 ${topRecordName}，${topRecords[0].sampleDate || '未标注日期'} 用能 ${formatEnergyNumber(topRecords[0].usageKwh)} kWh。`);
+    }
+    if (highestDate && lowestDate && highestDate.date !== lowestDate.date) {
+        const deltaPercent = lowestDate.usageKwh > 0
+            ? ((highestDate.usageKwh - lowestDate.usageKwh) / lowestDate.usageKwh) * 100
+            : 0;
+        lines.push(`- 按日期汇总，${highestDate.date} 最高 ${formatEnergyNumber(highestDate.usageKwh)} kWh，${lowestDate.date} 最低 ${formatEnergyNumber(lowestDate.usageKwh)} kWh，波动 ${formatEnergyNumber(deltaPercent)}%。`);
+    }
+    else if (topShare >= 0.45) {
+        lines.push(`- Top ${topRecords.length} 表计合计 ${formatEnergyNumber(topUsage)} kWh，占本次结果 ${formatEnergyNumber(topShare * 100)}%，负荷集中度较高。`);
+    }
+    else {
+        lines.push('- 当前返回数据分布相对均衡，可继续围绕高耗能表计和异常日期追问。');
+    }
+    lines.push('');
+    lines.push('## 重点对象');
+    topRecords.forEach((record, index) => {
+        const recordName = record.deviceName || record.energyItemPath || `表计 ${index + 1}`;
+        lines.push(`- ${index + 1}. ${recordName}：${formatEnergyNumber(record.usageKwh)} kWh${record.sampleDate ? `（${record.sampleDate}）` : ''}`);
+    });
+    lines.push('');
+    lines.push('## 建议');
+    if (input.action === 'energy-compare' && groupedDates.length < 2) {
+        lines.push('- 当前时间范围内只有单日数据，如需做趋势或对比，请扩大查询日期范围。');
+    }
+    else if (topShare >= 0.45) {
+        lines.push('- 优先排查排名靠前的表计或分项，确认是否存在异常长时运行、重复计量或负荷集中。');
+    }
+    else {
+        lines.push('- 可继续按设备、分项或日期下钻，定位具体的高耗能时段与设备。');
+    }
+    lines.push('- 如需更完整的自然语言报告，请在服务端配置 GEMINI_API_KEY 以启用大模型生成。');
+    return {
+        model: defaultModel,
+        reply: lines.join('\n'),
+        thinking: [
+            `已识别为 ${resolveActionLabel(input.action)} 场景`,
+            `总用能 ${formatEnergyNumber(totalUsageKwh)} kWh / 记录 ${matchedRecordCount}`,
+            queryIssue || '已结合查询结果生成本地分析',
+        ].join('\n'),
+        usedFallback: true,
+    };
+};
 const buildFallbackChat = (input) => {
     const context = input.context ?? {};
     const actionLabel = resolveActionLabel(input.action);
     const { availability, selection } = buildReportTemplatePromptContext(input);
     if (input.action === 'energy-report' || input.action === 'energy-diagnostic') {
         return buildFallbackReport(input, selection, availability);
+    }
+    if (input.dataPreview || readQueryIssue(input)) {
+        return buildFallbackEnergyAnalysis(input);
     }
     const reply = [
         `已按“${actionLabel}”模式整理你的问题。`,

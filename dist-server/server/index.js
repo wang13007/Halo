@@ -55,7 +55,7 @@ const parseUpstreamResponse = async (upstreamResponse) => {
     }
 };
 app.use(cors({ origin: resolveCorsOrigin() }));
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 app.get("/api", (_request, response) => {
     response.json({
         message: "Halo backend is running.",

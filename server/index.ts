@@ -92,7 +92,7 @@ const parseUpstreamResponse = async (upstreamResponse: Response) => {
 };
 
 app.use(cors({ origin: resolveCorsOrigin() }));
-app.use(express.json());
+app.use(express.json({ limit: "1mb" }));
 
 app.get("/api", (_request, response) => {
   response.json({
