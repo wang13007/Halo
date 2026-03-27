@@ -83,6 +83,9 @@ const isQuickTriggerOnlyInput = (value: string) =>
     .replace(/[\s,，。.、；;:：!！?？/\\-]/g, "")
     .length === 0;
 
+const isShortQuickTriggerInput = (value: string) =>
+  value.trim().replace(/\s+/g, "").length <= 2;
+
 const energyTypeLabels: Record<string, string> = {
   electricity: "电",
   gas: "燃气",
@@ -693,14 +696,12 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   }, [chatMessages, isThinking]);
 
   useEffect(() => {
-    if (hasQuickTrigger(input)) {
+    if (input.trim()) {
       setIsQuickOptionsVisible(true);
       return;
     }
 
-    if (!input.trim()) {
-      setIsQuickOptionsVisible(false);
-    }
+    setIsQuickOptionsVisible(false);
   }, [input]);
 
   useEffect(() => {
@@ -956,7 +957,9 @@ export const ChatWorkspace = ({ isDarkMode }: { isDarkMode: boolean }) => {
   const handleQuickIntentSelect = (intentId: QuickIntentId) => {
     setSelectedIntent(intentId);
     setInput((previous) =>
-      !previous.trim() || isQuickTriggerOnlyInput(previous)
+      !previous.trim() ||
+      isQuickTriggerOnlyInput(previous) ||
+      isShortQuickTriggerInput(previous)
         ? quickIntentDraftMap[intentId](promptProjectName)
         : previous,
     );
