@@ -67,12 +67,12 @@ type WidgetBodyProps = {
 const sizeButtonOptions: WidgetSize[] = ['1:1', '2:1', '2:2'];
 
 const dashboardGridClassName =
-  'grid grid-cols-1 gap-4 md:grid-flow-row-dense md:auto-rows-[minmax(160px,_auto)] md:grid-cols-6 xl:auto-rows-[minmax(172px,_auto)] xl:grid-cols-12';
+  'grid grid-cols-1 gap-4 md:grid-flow-row-dense md:auto-rows-[minmax(176px,_auto)] md:grid-cols-6 xl:auto-rows-[minmax(188px,_auto)] xl:grid-cols-12';
 
 const widgetMobileHeightClassMap: Record<WidgetSize, string> = {
-  '1:1': 'min-h-[340px] md:min-h-0',
-  '2:1': 'min-h-[380px] md:min-h-0',
-  '2:2': 'min-h-[720px] md:min-h-0',
+  '1:1': 'min-h-[360px] md:min-h-[432px] xl:min-h-[452px]',
+  '2:1': 'min-h-[400px] md:min-h-[432px] xl:min-h-[440px]',
+  '2:2': 'min-h-[760px] md:min-h-[760px] xl:min-h-[820px]',
 };
 
 const sizeDescriptionMap: Record<WidgetSize, string> = {
@@ -1070,7 +1070,7 @@ const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
 
   return (
     <article
-      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[var(--dashboard-radius-card)] border transition-[transform,box-shadow,border-color] duration-300 md:min-h-0 ${
+      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[var(--dashboard-radius-card)] border transition-[transform,box-shadow,border-color] duration-300 ${
         mode === 'board' ? 'hover:-translate-y-0.5' : ''
       } ${cardBorderClass} ${cardHighlightClass} ${cardShadowClass}`}
     >
@@ -1085,7 +1085,11 @@ const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
         }`}
       />
       {mode === 'preview' ? <WidgetToolbar isDarkMode={isDarkMode} onRemove={onRemove} /> : null}
-      <div className={`relative flex min-h-full flex-col p-[var(--dashboard-card-padding)] ${mode === 'preview' ? 'pr-[88px]' : ''}`}>
+      <div
+        className={`relative flex h-full min-h-full flex-col overflow-y-auto p-[var(--dashboard-card-padding)] ${
+          mode === 'preview' ? 'pr-[88px]' : ''
+        }`}
+      >
         {renderWidgetBody({ isDarkMode, theme, widget })}
       </div>
     </article>
@@ -1229,7 +1233,7 @@ export const DashboardHome = ({
   };
 
   return (
-    <div className="dashboard-page flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1">
+    <div className="dashboard-page flex min-h-full flex-col gap-3 pr-1 pb-1">
       <section className={`rounded-[var(--dashboard-radius-card)] border px-4 py-3 ${theme.boardSurface}`}>
         <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
@@ -1257,7 +1261,7 @@ export const DashboardHome = ({
         </div>
       </section>
 
-      <section className={`relative overflow-hidden rounded-[var(--dashboard-radius-card)] border p-4 ${theme.canvasSurface}`}>
+      <section className={`relative rounded-[var(--dashboard-radius-card)] border p-4 ${theme.canvasSurface}`}>
         <div
           className={`pointer-events-none absolute inset-0 ${
             isDarkMode

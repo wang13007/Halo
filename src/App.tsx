@@ -201,7 +201,11 @@ const App = () => {
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-hidden px-6 pb-5 lg:px-8">
+          <div
+            className={`min-h-0 flex-1 px-6 pb-5 lg:px-8 ${
+              activeTab === 'dashboard' ? 'overflow-y-auto' : 'overflow-hidden'
+            }`}
+          >
             {activeTab === 'dashboard' ? (
               <DashboardHome
                 dashboardState={dashboardState}
