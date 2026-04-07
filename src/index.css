@@ -3,12 +3,14 @@
 :root {
   color-scheme: light;
   font-family: "PingFang SC", "Microsoft YaHei", "Segoe UI", sans-serif;
-  --dashboard-radius-card: 28px;
-  --dashboard-radius-panel: 20px;
-  --dashboard-card-padding: 20px;
-  --dashboard-header-height: 56px;
-  --dashboard-shadow-light: 0 28px 72px -42px rgba(15, 23, 42, 0.22);
-  --dashboard-shadow-dark: 0 30px 78px -46px rgba(2, 6, 23, 0.82);
+  --dashboard-radius-card: 24px;
+  --dashboard-radius-panel: 18px;
+  --dashboard-card-padding: 22px;
+  --dashboard-header-height: 52px;
+  --dashboard-chart-height: 208px;
+  --dashboard-chart-height-lg: 248px;
+  --dashboard-shadow-light: 0 20px 56px -36px rgba(15, 23, 42, 0.2);
+  --dashboard-shadow-dark: 0 26px 64px -40px rgba(2, 6, 23, 0.72);
 }
 
 html,
@@ -41,7 +43,7 @@ select {
 
 .dashboard-page {
   --dashboard-title-size: 15px;
-  --dashboard-meta-size: 12px;
+  --dashboard-meta-size: 11px;
 }
 
 .dashboard-card-header {
@@ -50,15 +52,15 @@ select {
 
 .dashboard-title {
   font-size: var(--dashboard-title-size);
-  font-weight: 600;
-  line-height: 1.45;
+  font-weight: 650;
+  line-height: 1.4;
 }
 
 .dashboard-kicker,
 .dashboard-meta {
   font-size: var(--dashboard-meta-size);
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
 }
 
 .dashboard-value-lg {
@@ -90,6 +92,11 @@ select {
 
 .dashboard-chart {
   min-height: 0;
+}
+
+.dashboard-note {
+  font-size: 0.9rem;
+  line-height: 1.65;
 }
 
 .dashboard-title,

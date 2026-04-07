@@ -186,8 +186,12 @@ const App = () => {
         </aside>
 
         <main className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="shrink-0 px-6 pb-3 pt-6 lg:px-8">
-            <div className="flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+          <header
+            className={`shrink-0 px-6 lg:px-8 ${
+              activeTab === 'dashboard' ? 'pb-2 pt-4' : 'pb-3 pt-6'
+            }`}
+          >
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
               <div>
                 <h1 className={`text-2xl font-black tracking-tight lg:text-[30px] ${textPrimary}`}>
                   {pageMeta.title}
@@ -197,7 +201,7 @@ const App = () => {
             </div>
           </header>
 
-          <div className="min-h-0 flex-1 overflow-hidden px-6 pb-6 lg:px-8">
+          <div className="min-h-0 flex-1 overflow-hidden px-6 pb-5 lg:px-8">
             {activeTab === 'dashboard' ? (
               <DashboardHome
                 dashboardState={dashboardState}

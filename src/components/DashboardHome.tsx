@@ -48,6 +48,7 @@ type DashboardTheme = {
   canvasSurface: string;
   cardSurface: string;
   chipSurface: string;
+  divider: string;
   inputSurface: string;
   panelSurface: string;
   panelSurfaceStrong: string;
@@ -66,7 +67,7 @@ type WidgetBodyProps = {
 const sizeButtonOptions: WidgetSize[] = ['1:1', '2:1', '2:2'];
 
 const dashboardGridClassName =
-  'grid grid-cols-1 gap-5 md:grid-flow-row-dense md:auto-rows-[minmax(168px,_auto)] md:grid-cols-6 xl:auto-rows-[minmax(176px,_auto)] xl:grid-cols-12';
+  'grid grid-cols-1 gap-4 md:grid-flow-row-dense md:auto-rows-[minmax(160px,_auto)] md:grid-cols-6 xl:auto-rows-[minmax(172px,_auto)] xl:grid-cols-12';
 
 const widgetMobileHeightClassMap: Record<WidgetSize, string> = {
   '1:1': 'min-h-[340px] md:min-h-0',
@@ -185,16 +186,17 @@ const getWidgetIcon = (widget: DashboardWidget) =>
   widgetIconMap[widget.id] ?? (widget.category === 'custom' ? WandSparkles : Sparkles);
 
 const getDashboardTheme = (isDarkMode: boolean): DashboardTheme => ({
-  boardSurface: isDarkMode ? 'border-white/10 bg-slate-950/50' : 'border-slate-200/70 bg-white/70',
-  canvasSurface: isDarkMode ? 'border-white/10 bg-slate-950/58' : 'border-slate-200/70 bg-white/82',
+  boardSurface: isDarkMode ? 'border-white/10 bg-slate-950/55' : 'border-slate-200/80 bg-white/72',
+  canvasSurface: isDarkMode ? 'border-white/10 bg-slate-950/62' : 'border-slate-200/80 bg-white/84',
   cardSurface: isDarkMode
     ? 'border-white/10 bg-slate-900/88 shadow-[var(--dashboard-shadow-dark)]'
-    : 'border-white/95 bg-white/96 shadow-[var(--dashboard-shadow-light)]',
-  chipSurface: isDarkMode ? 'border-white/10 bg-white/[0.05]' : 'border-slate-200/75 bg-[#f7fafd]',
+    : 'border-slate-200/80 bg-white/96 shadow-[var(--dashboard-shadow-light)]',
+  chipSurface: isDarkMode ? 'border-white/8 bg-white/[0.035]' : 'border-slate-200/75 bg-slate-50/90',
+  divider: isDarkMode ? 'border-white/8' : 'border-slate-200/80',
   inputSurface: isDarkMode ? 'border-white/10 bg-slate-950/55' : 'border-slate-200/80 bg-white',
-  panelSurface: isDarkMode ? 'border-white/8 bg-white/[0.05]' : 'border-slate-200/80 bg-[#f5f8fc]',
-  panelSurfaceStrong: isDarkMode ? 'border-cyan-400/18 bg-[#0c1727]' : 'border-[#d8e5f2] bg-[#f8fbff]',
-  subtleSurface: isDarkMode ? 'bg-white/[0.06]' : 'bg-slate-100/90',
+  panelSurface: isDarkMode ? 'border-white/8 bg-white/[0.04]' : 'border-slate-200/75 bg-[#f8fafc]',
+  panelSurfaceStrong: isDarkMode ? 'border-white/12 bg-[#0d1828]' : 'border-slate-200/80 bg-[#f5f9fc]',
+  subtleSurface: isDarkMode ? 'bg-white/[0.05]' : 'bg-slate-100/85',
   textPrimary: isDarkMode ? 'text-slate-50' : 'text-slate-900',
   textSecondary: isDarkMode ? 'text-slate-300' : 'text-slate-700',
   textMuted: isDarkMode ? 'text-slate-400' : 'text-slate-500',
@@ -217,16 +219,48 @@ const RatioPreview = ({ isDarkMode, size }: { isDarkMode: boolean; size: WidgetS
 };
 
 const DashboardPill = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
-  <span className={`inline-flex items-center rounded-full px-3 py-1 text-[11px] font-semibold tracking-[0.18em] uppercase ${className}`}>
+  <span
+    className={`inline-flex items-center rounded-full border border-transparent px-2.5 py-1 text-[11px] font-semibold tracking-[0.08em] ${className}`}
+  >
     {children}
   </span>
 );
 
-const MetricTile = ({ label, theme, value }: { label: string; theme: DashboardTheme; value: string }) => (
-  <div className={`rounded-[var(--dashboard-radius-panel)] border p-4 ${theme.panelSurface}`}>
-    <div className={`dashboard-meta ${theme.textMuted}`}>{label}</div>
-    <div className={`mt-2 text-base font-semibold ${theme.textPrimary}`}>{value}</div>
+const WidgetPanel = ({
+  children,
+  className = '',
+  emphasis = 'default',
+  theme,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  emphasis?: 'default' | 'strong';
+  theme: DashboardTheme;
+}) => (
+  <div
+    className={`rounded-[var(--dashboard-radius-panel)] border p-4 ${
+      emphasis === 'strong' ? theme.panelSurfaceStrong : theme.panelSurface
+    } ${className}`}
+  >
+    {children}
   </div>
+);
+
+const MetricTile = ({
+  className = '',
+  label,
+  theme,
+  value,
+}: {
+  className?: string;
+  label: string;
+  theme: DashboardTheme;
+  value: string;
+}) => (
+  <WidgetPanel className={`flex h-full flex-col justify-between ${className}`} theme={theme}>
+    <div className={`dashboard-meta ${theme.textMuted}`}>{label}</div>
+    <div className={`mt-3 text-base font-semibold ${theme.textPrimary}`}>{value}</div>
+  </WidgetPanel>
 );
 
 const WidgetHeader = ({
@@ -244,7 +278,9 @@ const WidgetHeader = ({
 }) => (
   <div className="dashboard-card-header flex items-start justify-between gap-3">
     <div className="flex min-w-0 items-start gap-3">
-      <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[18px] border ${theme.panelSurfaceStrong} ${theme.textPrimary}`}>
+      <span
+        className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-[16px] border ${theme.panelSurfaceStrong} ${theme.textPrimary}`}
+      >
         <Icon size={18} />
       </span>
       <div className="min-w-0">
@@ -254,6 +290,47 @@ const WidgetHeader = ({
     </div>
     {status ? <div className="shrink-0">{status}</div> : null}
   </div>
+);
+
+const WidgetFooter = ({
+  children,
+  className = '',
+  theme,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  theme: DashboardTheme;
+}) => <div className={`border-t pt-4 ${theme.divider} ${className}`}>{children}</div>;
+
+const ChartPanel = ({
+  children,
+  className = '',
+  footer,
+  legend,
+  theme,
+  title,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  footer?: React.ReactNode;
+  legend?: React.ReactNode;
+  theme: DashboardTheme;
+  title: string;
+}) => (
+  <WidgetPanel className={`flex min-h-0 flex-1 flex-col ${className}`} theme={theme}>
+    <div className="flex flex-wrap items-start justify-between gap-3">
+      <div className={`dashboard-meta ${theme.textMuted}`}>{title}</div>
+      {legend ? <div className="flex flex-wrap items-center gap-3">{legend}</div> : null}
+    </div>
+    <div className="dashboard-chart mt-4 flex min-h-[var(--dashboard-chart-height)] flex-1 items-center">
+      {children}
+    </div>
+    {footer ? (
+      <div className={`mt-4 border-t pt-3 text-xs leading-5 ${theme.divider} ${theme.textMuted}`}>
+        {footer}
+      </div>
+    ) : null}
+  </WidgetPanel>
 );
 
 const WidgetToolbar = ({ isDarkMode, onRemove }: { isDarkMode: boolean; onRemove?: () => void }) => (
@@ -330,37 +407,39 @@ const ChartTooltip = ({
 };
 
 const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-4">
-    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_220px]">
+  <div className="flex h-full flex-col gap-5">
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_228px]">
       <div className="min-w-0">
         <WidgetHeader icon={Bolt} subtitle="集团今日总览" theme={theme} title={widget.title} />
       </div>
-      <div className={`rounded-[var(--dashboard-radius-panel)] border p-4 ${theme.panelSurfaceStrong}`}>
+      <WidgetPanel className="flex flex-col justify-between" emphasis="strong" theme={theme}>
         <div className={`dashboard-meta ${theme.textMuted}`}>实时峰值负荷</div>
-        <div className="mt-2 text-[28px] font-bold tracking-[-0.04em] text-cyan-600">5,240</div>
-        <div className={`mt-1 text-sm font-medium ${theme.textSecondary}`}>kW，峰值时段 13:00 - 15:00</div>
-      </div>
+        <div className="mt-3 text-[24px] font-bold tracking-[-0.04em] text-cyan-600">5,240</div>
+        <div className={`mt-2 text-sm leading-6 ${theme.textSecondary}`}>kW，峰值时段 13:00 - 15:00</div>
+      </WidgetPanel>
     </div>
 
-    <div className="grid flex-1 gap-5 lg:grid-cols-[minmax(0,1fr)_220px]">
-      <div className="flex min-h-0 flex-1 flex-col gap-5">
+    <div className="grid flex-1 gap-4 lg:grid-cols-[minmax(0,1fr)_228px]">
+      <div className="flex min-h-0 flex-1 flex-col justify-between gap-5">
         <div>
           <div className={`dashboard-kicker ${theme.textMuted}`}>今日累计电量</div>
           <div className="mt-3 flex flex-wrap items-end gap-2">
             <div className={`dashboard-value-lg ${theme.textPrimary}`}>42,850.4</div>
             <div className={`dashboard-unit ${theme.textMuted}`}>kWh</div>
           </div>
-          <div className={`mt-3 max-w-2xl text-sm leading-6 ${theme.textSecondary}`}>主指标与辅助信息统一左对齐，减少无效留白并强化阅读节奏。</div>
+          <div className={`dashboard-note mt-3 max-w-2xl ${theme.textSecondary}`}>{widget.helper}</div>
         </div>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <MetricTile label="较昨日同期" theme={theme} value="+3.2%" />
-          <MetricTile label="小时平均负荷" theme={theme} value="3,570 kWh" />
-        </div>
+
+        <WidgetFooter theme={theme}>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <MetricTile label="较昨日同期" theme={theme} value="+3.2%" />
+            <MetricTile label="小时平均负荷" theme={theme} value="3,570 kWh" />
+          </div>
+        </WidgetFooter>
       </div>
 
-      <div className={`flex flex-col rounded-[var(--dashboard-radius-panel)] border p-4 ${theme.panelSurface}`}>
-        <div className={`dashboard-meta ${theme.textMuted}`}>7 时段负荷节奏</div>
-        <div className="mt-4 flex flex-1 items-end gap-2">
+      <ChartPanel footer="负荷节奏作为辅助判断信息，避免与主指标形成竞争。" theme={theme} title="7 时段负荷节奏">
+        <div className="flex h-full w-full items-end gap-2">
           {energySparkBars.map((height, index) => (
             <div key={`energy-spark-${index}`} className="flex h-full flex-1 items-end">
               <div
@@ -372,24 +451,24 @@ const EnergyOverviewCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
             </div>
           ))}
         </div>
-        <div className={`mt-3 flex items-center justify-between text-xs ${theme.textMuted}`}>
-          <span>凌晨</span>
-          <span>午间</span>
-          <span>晚高峰</span>
-        </div>
-      </div>
+      </ChartPanel>
     </div>
   </div>
 );
 
 const PowerCompositionCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-4">
+  <div className="flex h-full flex-col gap-5">
     <WidgetHeader icon={BarChart3} subtitle="实时结构占比" theme={theme} title={widget.title} />
-    <div className="flex flex-1 flex-col gap-4">
+    <ChartPanel footer={widget.helper} theme={theme} title="租户与公共区域">
       <DonutGauge isDarkMode={isDarkMode} label="租户用电占比" percentage={60} />
+    </ChartPanel>
+    <WidgetFooter theme={theme}>
       <div className="space-y-3">
         {powerCompositionData.map((item) => (
-          <div key={item.label} className={`flex items-center justify-between rounded-[18px] border px-3.5 py-3 ${theme.chipSurface}`}>
+          <div
+            key={item.label}
+            className={`flex items-center justify-between rounded-[16px] border px-3.5 py-3 ${theme.chipSurface}`}
+          >
             <div className="flex items-center gap-3">
               <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
               <span className={`text-sm font-medium ${theme.textSecondary}`}>{item.label}</span>
@@ -398,12 +477,12 @@ const PowerCompositionCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) =>
           </div>
         ))}
       </div>
-    </div>
+    </WidgetFooter>
   </div>
 );
 
 const SolarPowerCard = ({ theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-4">
+  <div className="flex h-full flex-col gap-5">
     <WidgetHeader
       icon={SunMedium}
       status={<DashboardPill className="bg-cyan-50 text-cyan-700">运行中</DashboardPill>}
@@ -411,32 +490,35 @@ const SolarPowerCard = ({ theme, widget }: WidgetBodyProps) => (
       theme={theme}
       title={widget.title}
     />
-    <div className="flex flex-1 flex-col gap-4">
+    <div className="flex flex-1 flex-col justify-between gap-5">
       <div>
         <div className={`dashboard-kicker ${theme.textMuted}`}>实时功率</div>
         <div className="mt-3 flex flex-wrap items-end gap-2">
           <div className={`dashboard-value-md ${theme.textPrimary}`}>1,248.5</div>
           <div className={`dashboard-unit ${theme.textMuted}`}>kW</div>
         </div>
+        <div className={`dashboard-note mt-3 ${theme.textSecondary}`}>{widget.helper}</div>
       </div>
-      <div className={`rounded-[var(--dashboard-radius-panel)] border p-4 ${theme.panelSurfaceStrong}`}>
-        <div className={`dashboard-meta ${theme.textMuted}`}>今日累计发电</div>
-        <div className="mt-2 flex items-end justify-between gap-3">
-          <div className="min-w-0">
-            <div className="text-xl font-bold tracking-[-0.03em] text-cyan-600">8,450 kWh</div>
-            <div className={`mt-1 text-sm ${theme.textSecondary}`}>逆变效率 98.1%，运行状态稳定</div>
+      <WidgetFooter theme={theme}>
+        <WidgetPanel emphasis="strong" theme={theme}>
+          <div className={`dashboard-meta ${theme.textMuted}`}>今日累计发电</div>
+          <div className="mt-3 flex items-end justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-xl font-bold tracking-[-0.03em] text-cyan-600">8,450 kWh</div>
+              <div className={`mt-1 text-sm ${theme.textSecondary}`}>逆变效率 98.1%，运行状态稳定</div>
+            </div>
+            <SunMedium size={24} className="shrink-0 text-cyan-400" />
           </div>
-          <SunMedium size={24} className="shrink-0 text-cyan-400" />
-        </div>
-      </div>
+        </WidgetPanel>
+      </WidgetFooter>
     </div>
   </div>
 );
 
 const SystemRankingCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
-  <div className="flex h-full flex-col gap-4">
+  <div className="flex h-full flex-col gap-5">
     <WidgetHeader icon={ListTodo} subtitle="按系统维度" theme={theme} title={widget.title} />
-    <div className="flex flex-1 flex-col gap-4">
+    <WidgetPanel className="flex flex-1 flex-col justify-center gap-4" theme={theme}>
       {systemRankingData.map((item, index) => (
         <div key={item.label}>
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -460,7 +542,10 @@ const SystemRankingCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
           </div>
         </div>
       ))}
-    </div>
+    </WidgetPanel>
+    <WidgetFooter theme={theme}>
+      <div className={`dashboard-note ${theme.textSecondary}`}>{widget.helper}</div>
+    </WidgetFooter>
   </div>
 );
 
@@ -684,6 +769,251 @@ const GenericInsightCard = ({ theme, widget }: WidgetBodyProps) => {
   );
 };
 
+const RefinedMultiEnergyCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col gap-5">
+    <WidgetHeader
+      icon={Gauge}
+      status={<DashboardPill className="bg-slate-100 text-slate-700">电 / 水 / 气</DashboardPill>}
+      subtitle="综合能耗主图"
+      theme={theme}
+      title={widget.title}
+    />
+    <ChartPanel
+      className="min-h-[var(--dashboard-chart-height-lg)]"
+      footer={widget.helper}
+      legend={
+        <>
+          {multiEnergyLegend.map((item) => (
+            <div key={item.key} className="flex items-center gap-2">
+              <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: item.color }} />
+              <span className={`text-xs font-medium ${theme.textSecondary}`}>{item.label}</span>
+            </div>
+          ))}
+        </>
+      }
+      theme={theme}
+      title="分时曲线"
+    >
+      <div className="h-full w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={multiEnergySeries} margin={{ bottom: 0, left: -12, right: 4, top: 8 }}>
+            <defs>
+              <linearGradient id="refinedElectricFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#0f7a8d" stopOpacity={0.28} />
+                <stop offset="100%" stopColor="#0f7a8d" stopOpacity={0.03} />
+              </linearGradient>
+              <linearGradient id="refinedWaterFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#18b7d4" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="#18b7d4" stopOpacity={0.02} />
+              </linearGradient>
+              <linearGradient id="refinedGasFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#f4a340" stopOpacity={0.18} />
+                <stop offset="100%" stopColor="#f4a340" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke={chartGridColor(isDarkMode)} strokeDasharray="4 4" vertical={false} />
+            <XAxis axisLine={false} dataKey="time" tick={{ fill: chartAxisColor(isDarkMode), fontSize: 12 }} tickLine={false} />
+            <YAxis axisLine={false} tick={{ fill: chartAxisColor(isDarkMode), fontSize: 12 }} tickLine={false} width={32} />
+            <Tooltip content={<ChartTooltip isDarkMode={isDarkMode} />} />
+            <Area dataKey="electric" fill="url(#refinedElectricFill)" name="电能" stroke="#0f7a8d" strokeWidth={2.4} type="monotone" />
+            <Area dataKey="water" fill="url(#refinedWaterFill)" name="水能" stroke="#18b7d4" strokeWidth={2.2} type="monotone" />
+            <Area dataKey="gas" fill="url(#refinedGasFill)" name="燃气" stroke="#f4a340" strokeWidth={2.2} type="monotone" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartPanel>
+    <WidgetFooter theme={theme}>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <MetricTile label="电能峰值" theme={theme} value="92 kWh" />
+        <MetricTile label="水能午后回落" theme={theme} value="18 -> 12" />
+        <MetricTile label="燃气总体稳定" theme={theme} value="6 - 18" />
+      </div>
+    </WidgetFooter>
+  </div>
+);
+
+const RefinedCarbonMonitorCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col gap-5">
+    <WidgetHeader icon={Leaf} subtitle="双碳监测" theme={theme} title={widget.title} />
+    <div className="flex flex-1 flex-col justify-between gap-5">
+      <div>
+        <div className={`dashboard-kicker ${theme.textMuted}`}>今日碳减排量</div>
+        <div className="mt-3 flex flex-wrap items-end gap-2">
+          <div className={`dashboard-value-md ${theme.textPrimary}`}>24.8</div>
+          <div className={`dashboard-unit ${theme.textMuted}`}>tCO2e</div>
+        </div>
+        <div className={`dashboard-note mt-3 ${theme.textSecondary}`}>{widget.helper}</div>
+      </div>
+      <WidgetFooter theme={theme}>
+        <WidgetPanel theme={theme}>
+          <div className="flex items-center justify-between gap-3">
+            <div className={`dashboard-meta ${theme.textMuted}`}>月度目标进度</div>
+            <div className={`text-sm font-semibold ${theme.textPrimary}`}>68%</div>
+          </div>
+          <div className={`mt-3 h-2.5 rounded-full ${isDarkMode ? 'bg-white/8' : 'bg-slate-100'}`}>
+            <div className="h-full w-[68%] rounded-full bg-gradient-to-r from-emerald-500 to-lime-400" />
+          </div>
+          <div className={`mt-4 text-sm leading-6 ${theme.textSecondary}`}>
+            已抵消约 1,240 棵成年树木年吸收量，减排表现稳定。
+          </div>
+        </WidgetPanel>
+      </WidgetFooter>
+    </div>
+  </div>
+);
+
+const RefinedForecastCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col gap-5">
+    <WidgetHeader
+      icon={Activity}
+      status={<DashboardPill className="bg-cyan-50 text-cyan-700">未来 24h</DashboardPill>}
+      subtitle="预测与调度建议"
+      theme={theme}
+      title={widget.title}
+    />
+    <ChartPanel footer={widget.helper} theme={theme} title="预测负荷曲线">
+      <div className="h-full w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <AreaChart data={forecastSeries} margin={{ bottom: 0, left: -12, right: 4, top: 8 }}>
+            <defs>
+              <linearGradient id="refinedForecastFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%" stopColor="#14b8a6" stopOpacity={0.25} />
+                <stop offset="100%" stopColor="#14b8a6" stopOpacity={0.02} />
+              </linearGradient>
+            </defs>
+            <CartesianGrid stroke={chartGridColor(isDarkMode)} strokeDasharray="4 4" vertical={false} />
+            <XAxis axisLine={false} dataKey="time" tick={{ fill: chartAxisColor(isDarkMode), fontSize: 12 }} tickLine={false} />
+            <YAxis axisLine={false} tick={{ fill: chartAxisColor(isDarkMode), fontSize: 12 }} tickLine={false} width={32} />
+            <Tooltip content={<ChartTooltip isDarkMode={isDarkMode} />} />
+            <Area dataKey="load" fill="url(#refinedForecastFill)" name="负荷" stroke="#14b8a6" strokeWidth={2.4} type="monotone" />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+    </ChartPanel>
+    <WidgetFooter theme={theme}>
+      <div className="grid gap-4 lg:grid-cols-3">
+        <MetricTile label="预测峰值窗口" theme={theme} value="18:00 - 21:00" />
+        <MetricTile label="预计波动幅度" theme={theme} value="+6.4%" />
+        <MetricTile label="建议动作" theme={theme} value="17:00 前启动预冷" />
+      </div>
+    </WidgetFooter>
+  </div>
+);
+
+const RefinedStorageCard = ({ isDarkMode, theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col gap-5">
+    <WidgetHeader icon={BatteryCharging} subtitle="储能调度" theme={theme} title={widget.title} />
+    <div className="grid flex-1 gap-4 lg:grid-cols-[220px_minmax(0,1fr)]">
+      <WidgetPanel className="flex flex-col justify-between" emphasis="strong" theme={theme}>
+        <div className={`dashboard-kicker ${theme.textMuted}`}>可用容量</div>
+        <div className={`mt-3 dashboard-value-md ${theme.textPrimary}`}>72%</div>
+        <div className={`mt-2 text-sm leading-6 ${theme.textSecondary}`}>晚高峰前完成准备，预计可削峰 480 kW。</div>
+      </WidgetPanel>
+      <WidgetPanel className="grid gap-3" theme={theme}>
+        {storageTimeline.map((item) => (
+          <div key={item.label} className={`rounded-[16px] border px-4 py-3 ${theme.chipSurface}`}>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className={`text-sm font-semibold ${theme.textPrimary}`}>{item.label}</div>
+                <div className={`mt-1 text-xs ${theme.textMuted}`}>{item.meta}</div>
+              </div>
+              <div className={`text-sm font-semibold ${theme.textPrimary}`}>{item.value}%</div>
+            </div>
+            <div className={`mt-3 h-2 rounded-full ${isDarkMode ? 'bg-white/8' : 'bg-slate-100'}`}>
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-400"
+                style={{ width: `${item.value}%` }}
+              />
+            </div>
+          </div>
+        ))}
+      </WidgetPanel>
+    </div>
+    <WidgetFooter theme={theme}>
+      <div className={`dashboard-note ${theme.textSecondary}`}>{widget.helper}</div>
+    </WidgetFooter>
+  </div>
+);
+
+const RefinedAlertClosureCard = ({ theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col gap-5">
+    <WidgetHeader icon={AlertTriangle} subtitle="处理闭环" theme={theme} title={widget.title} />
+    <div className="flex flex-1 flex-col justify-between gap-5">
+      <div>
+        <div className={`dashboard-kicker ${theme.textMuted}`}>5 分钟响应率</div>
+        <div className={`mt-3 dashboard-value-md ${theme.textPrimary}`}>87%</div>
+        <div className={`dashboard-note mt-3 ${theme.textSecondary}`}>{widget.helper}</div>
+      </div>
+      <WidgetFooter theme={theme}>
+        <div className="space-y-3">
+          {alertSummary.map((item) => (
+            <div key={item.label} className={`flex items-center justify-between rounded-[16px] border px-3.5 py-3 ${theme.chipSurface}`}>
+              <span className={`text-sm font-medium ${theme.textSecondary}`}>{item.label}</span>
+              <span className={`text-sm font-semibold ${theme.textPrimary}`}>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </WidgetFooter>
+    </div>
+  </div>
+);
+
+const RefinedSavingsPoolCard = ({ theme, widget }: WidgetBodyProps) => (
+  <div className="flex h-full flex-col gap-5">
+    <WidgetHeader icon={Sparkles} subtitle="节能机会池" theme={theme} title={widget.title} />
+    <div className="flex flex-1 flex-col justify-between gap-5">
+      <div>
+        <div className={`dashboard-kicker ${theme.textMuted}`}>预计月度收益</div>
+        <div className={`mt-3 dashboard-value-md ${theme.textPrimary}`}>￥12.6 万</div>
+        <div className={`dashboard-note mt-3 ${theme.textSecondary}`}>{widget.helper}</div>
+      </div>
+      <WidgetFooter theme={theme}>
+        <div className="space-y-3">
+          {savingsSummary.map((item) => (
+            <div key={item.label} className={`flex items-center justify-between rounded-[16px] border px-3.5 py-3 ${theme.chipSurface}`}>
+              <span className={`text-sm font-medium ${theme.textSecondary}`}>{item.label}</span>
+              <span className={`text-xs font-semibold ${theme.textPrimary}`}>{item.value}</span>
+            </div>
+          ))}
+        </div>
+      </WidgetFooter>
+    </div>
+  </div>
+);
+
+const RefinedGenericInsightCard = ({ theme, widget }: WidgetBodyProps) => {
+  const Icon = getWidgetIcon(widget);
+  return (
+    <div className="flex h-full flex-col gap-5">
+      <WidgetHeader
+        icon={Icon}
+        status={
+          <DashboardPill className={widget.category === 'custom' ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-700'}>
+            {widget.category === 'custom' ? 'AI 定制' : '系统卡片'}
+          </DashboardPill>
+        }
+        subtitle={widget.description}
+        theme={theme}
+        title={widget.title}
+      />
+      <div>
+        <div className={`dashboard-value-md ${theme.textPrimary}`}>{widget.value}</div>
+        <div className={`dashboard-note mt-3 ${theme.textSecondary}`}>{widget.helper}</div>
+      </div>
+      <WidgetFooter theme={theme}>
+        <div className="space-y-3">
+          {widget.items.slice(0, widget.size === '1:1' ? 3 : 4).map((item) => (
+            <div key={item} className={`flex items-start gap-3 rounded-[16px] border px-3.5 py-3 ${theme.chipSurface}`}>
+              <span className="mt-1.5 h-2 w-2 shrink-0 rounded-full bg-cyan-500" />
+              <span className={`text-sm leading-6 ${theme.textSecondary}`}>{item}</span>
+            </div>
+          ))}
+        </div>
+      </WidgetFooter>
+    </div>
+  );
+};
+
 const renderWidgetBody = (props: WidgetBodyProps) => {
   switch (props.widget.id) {
     case 'widget-energy':
@@ -695,19 +1025,19 @@ const renderWidgetBody = (props: WidgetBodyProps) => {
     case 'widget-actions':
       return <SystemRankingCard {...props} />;
     case 'widget-focus':
-      return <MultiEnergyCard {...props} />;
+      return <RefinedMultiEnergyCard {...props} />;
     case 'widget-rhythm':
-      return <CarbonMonitorCard {...props} />;
+      return <RefinedCarbonMonitorCard {...props} />;
     case 'widget-forecast':
-      return <ForecastCard {...props} />;
+      return <RefinedForecastCard {...props} />;
     case 'widget-storage':
-      return <StorageCard {...props} />;
+      return <RefinedStorageCard {...props} />;
     case 'widget-alerts':
-      return <AlertClosureCard {...props} />;
+      return <RefinedAlertClosureCard {...props} />;
     case 'widget-savings':
-      return <SavingsPoolCard {...props} />;
+      return <RefinedSavingsPoolCard {...props} />;
     default:
-      return <GenericInsightCard {...props} />;
+      return <RefinedGenericInsightCard {...props} />;
   }
 };
 
@@ -727,30 +1057,31 @@ const DashboardWidgetCard: React.FC<DashboardWidgetCardProps> = ({
   widget,
 }) => {
   const theme = getDashboardTheme(isDarkMode);
-  const cardInsetSurface = isDarkMode
-    ? 'border-white/10 bg-slate-900/88'
-    : 'border-white/95 bg-white/96';
+  const cardBorderClass = isDarkMode ? 'border-white/10 bg-slate-900/92' : 'border-slate-200/80 bg-white/96';
   const cardShadowClass = isDarkMode
     ? 'shadow-[var(--dashboard-shadow-dark)]'
     : 'shadow-[var(--dashboard-shadow-light)]';
-  const cardHaloOpacityClass = isDarkMode ? 'opacity-30' : 'opacity-20';
+  const cardHighlightClass = highlight
+    ? isDarkMode
+      ? 'ring-2 ring-cyan-400/45'
+      : 'ring-2 ring-cyan-400/35'
+    : '';
+  const cardHaloOpacityClass = isDarkMode ? 'opacity-[0.18]' : 'opacity-[0.12]';
 
   return (
     <article
-      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[var(--dashboard-radius-card)] transition duration-300 md:min-h-0 ${
+      className={`${widgetSizeClassMap[widget.size]} ${widgetMobileHeightClassMap[widget.size]} relative min-w-0 overflow-hidden rounded-[var(--dashboard-radius-card)] border transition-[transform,box-shadow,border-color] duration-300 md:min-h-0 ${
         mode === 'board' ? 'hover:-translate-y-0.5' : ''
-      } ${highlight ? 'ring-2 ring-cyan-400/55' : ''} ${cardShadowClass}`}
+      } ${cardBorderClass} ${cardHighlightClass} ${cardShadowClass}`}
     >
       <div
         className={`pointer-events-none absolute inset-0 bg-gradient-to-br ${widget.accent} ${cardHaloOpacityClass}`}
       />
       <div
-        className={`pointer-events-none absolute inset-px rounded-[calc(var(--dashboard-radius-card)-1px)] border ${cardInsetSurface}`}
-      />
-      <div className={`absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r ${widget.accent}`} />
-      <div
-        className={`pointer-events-none absolute inset-0 rounded-[var(--dashboard-radius-card)] ring-1 ring-inset ${
-          isDarkMode ? 'ring-white/10' : 'ring-slate-900/6'
+        className={`pointer-events-none absolute inset-0 ${
+          isDarkMode
+            ? 'bg-[linear-gradient(180deg,rgba(255,255,255,0.04),transparent_28%)]'
+            : 'bg-[linear-gradient(180deg,rgba(255,255,255,0.74),rgba(255,255,255,0)_28%)]'
         }`}
       />
       {mode === 'preview' ? <WidgetToolbar isDarkMode={isDarkMode} onRemove={onRemove} /> : null}
@@ -898,12 +1229,12 @@ export const DashboardHome = ({
   };
 
   return (
-    <div className="dashboard-page flex h-full min-h-0 flex-col gap-4 overflow-y-auto pr-1">
-      <section className={`rounded-[var(--dashboard-radius-card)] border p-4 ${theme.boardSurface}`}>
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+    <div className="dashboard-page flex h-full min-h-0 flex-col gap-3 overflow-y-auto pr-1">
+      <section className={`rounded-[var(--dashboard-radius-card)] border px-4 py-3 ${theme.boardSurface}`}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <div className={`dashboard-kicker ${theme.textMuted}`}>运行看板</div>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-2.5 flex flex-wrap gap-2">
               {dashboardState.tabs.map((tab) => (
                 <button
                   key={tab.id}
@@ -926,9 +1257,14 @@ export const DashboardHome = ({
         </div>
       </section>
 
-      <section className={`relative overflow-hidden rounded-[var(--dashboard-radius-card)] border p-5 ${theme.canvasSurface}`}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.10),transparent_40%)]" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-cyan-500/60 via-sky-400/50 to-transparent" />
+      <section className={`relative overflow-hidden rounded-[var(--dashboard-radius-card)] border p-4 ${theme.canvasSurface}`}>
+        <div
+          className={`pointer-events-none absolute inset-0 ${
+            isDarkMode
+              ? 'bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.12),transparent_36%)]'
+              : 'bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.08),transparent_34%)]'
+          }`}
+        />
 
         {activeWidgets.length === 0 ? (
           <div className={`flex min-h-[420px] items-center justify-center rounded-[var(--dashboard-radius-panel)] border border-dashed ${theme.inputSurface}`}>
